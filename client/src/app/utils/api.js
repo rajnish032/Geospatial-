@@ -1,16 +1,20 @@
-const API_BASE_URL = "http://localhost:5000/api/auth"; 
+const API_BASE_URL = "http://localhost:8000/api/auth"; // ✅ Updated Base URL
 
 export const sendOtp = async (phone, type) => {
   try {
     const response = await fetch(`${API_BASE_URL}/send-otp`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include", // ✅ Include cookies for authentication
       body: JSON.stringify({ phone, type }),
     });
-    return await response.json();
+
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || "Failed to send OTP");
+    return data;
   } catch (error) {
     console.error("Error sending OTP:", error);
-    return { success: false, message: "Something went wrong" };
+    return { success: false, message: error.message };
   }
 };
 
@@ -19,12 +23,16 @@ export const verifyOtp = async (phone, otp, type) => {
     const response = await fetch(`${API_BASE_URL}/verify-otp`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify({ phone, otp, type }),
     });
-    return await response.json();
+
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || "OTP verification failed");
+    return data;
   } catch (error) {
     console.error("Error verifying OTP:", error);
-    return { success: false, message: "Something went wrong" };
+    return { success: false, message: error.message };
   }
 };
 
@@ -33,11 +41,15 @@ export const registerUser = async (formData) => {
     const response = await fetch(`${API_BASE_URL}/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify(formData),
     });
-    return await response.json();
+
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || "Registration failed");
+    return data;
   } catch (error) {
     console.error("Error registering user:", error);
-    return { success: false, message: "Something went wrong" };
+    return { success: false, message: error.message };
   }
 };

@@ -1,30 +1,30 @@
-import { NextResponse } from 'next/server'
+import { NextResponse } from 'next/server';
 
-// Array of paths to check against
+// Paths that should only be accessible when NOT logged in
 const authPaths = ['/account/login', '/account/register'];
 
 export async function middleware(request) {
   try {
-    const isAuthenticated = request.cookies.get('is_auth')?.value
+    const isAuthenticated = request.cookies.get('accessToken')?.value; // ✅ Check for JWT token
     const path = request.nextUrl.pathname;
 
-    if (isAuthenticated) {
-      if (authPaths.includes(path)) {
-        return NextResponse.redirect(new URL('/user/profile', request.url));
-      }
+    // ✅ Redirect authenticated users away from login/register pages
+    if (isAuthenticated && authPaths.includes(path)) {
+      return NextResponse.redirect(new URL('/user/profile', request.url));
     }
 
-    if (!isAuthenticated && !authPaths.includes(path)) {
+    // ✅ Redirect unauthenticated users away from protected pages
+    if (!isAuthenticated && path.startsWith('/user')) {
       return NextResponse.redirect(new URL('/account/login', request.url));
     }
-    return NextResponse.next()
+
+    return NextResponse.next();
   } catch (error) {
     console.error('Error occurred while checking authentication:', error);
-    // Handle the error, maybe return a response with 500 status code
-    return NextResponse.error();
+    return NextResponse.redirect(new URL('/account/login', request.url)); // ✅ Handle errors gracefully
   }
 }
 
 export const config = {
-  matcher: ['/user/:path*', '/account/login', '/account/register']
-}
+  matcher: ['/user/:path*', '/account/login', '/account/register'],
+};

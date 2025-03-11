@@ -5,10 +5,10 @@ const generateTokens = async (user) => {
     const payload = { _id: user._id, roles: user.roles };
 
     // Generate access token with expiration time
-    const accessTokenExp = Math.floor(Date.now() / 1000) + 100; // Set expiration to 100 seconds from now
+    const accessTokenExp = Math.floor(Date.now() / 1000) + 60*60; // Set expiration to 1h from now
     const accessToken = jwt.sign(
       { ...payload, exp: accessTokenExp },
-      process.env.JWT_ACCESS_TOKEN_SECRET_KEY,
+      process.env.JWT_ACCESS_TOKEN_SECRET_KEY
       // { expiresIn: '10s' }
     );
 
@@ -16,11 +16,13 @@ const generateTokens = async (user) => {
     const refreshTokenExp = Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 5; // Set expiration to 5 days from now
     const refreshToken = jwt.sign(
       { ...payload, exp: refreshTokenExp },
-      process.env.JWT_REFRESH_TOKEN_SECRET_KEY,
+      process.env.JWT_REFRESH_TOKEN_SECRET_KEY
       // { expiresIn: '5d' }
     );
 
-    const userRefreshToken = await UserRefreshTokenModel.findOneAndDelete({ userId: user._id });
+    const userRefreshToken = await UserRefreshTokenModel.findOneAndDelete({
+      userId: user._id,
+    });
 
     //  // if want to blacklist rather than remove then use below code
     // if (userRefreshToken) {
@@ -29,12 +31,20 @@ const generateTokens = async (user) => {
     // }
 
     // Save New Refresh Token
-    await new UserRefreshTokenModel({ userId: user._id, token: refreshToken }).save();
+    await new UserRefreshTokenModel({
+      userId: user._id,
+      token: refreshToken,
+    }).save();
 
-    return Promise.resolve({ accessToken, refreshToken, accessTokenExp, refreshTokenExp });
+    return Promise.resolve({
+      accessToken,
+      refreshToken,
+      accessTokenExp,
+      refreshTokenExp,
+    });
   } catch (error) {
     return Promise.reject(error);
   }
-}
+};
 
-export default generateTokens
+export default generateTokens;

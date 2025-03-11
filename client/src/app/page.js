@@ -5,9 +5,8 @@ import { Feedback } from "@/components/feedback";
 import Header, { ImagesSliderDemo } from "@/components/header";
 import Hero from "@/components/hero";
 
-
-
-
+import Register from "./account/register/page";
+import Footer from "@/components/footer";
 
 
 
@@ -53,14 +52,16 @@ export default function Home() {
   return (
     <main>
       
-     <ImagesSliderDemo/>
       
+     <ImagesSliderDemo/>
+     <Register/>
       <FeatureSection features={featuresData} />
       
       <Hero/>
 
       <FAQ />
       <Feedback />
+      <Footer />
 
     </main>
   );

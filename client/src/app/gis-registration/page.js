@@ -13,6 +13,8 @@ export default function GISRegistrationForm() {
     gender: "Male",
     contactNumber: "",
     email: "",
+    nationality: "",
+    profileImage: null,
     address: "",
     education: "",
     institution: "",
@@ -49,19 +51,36 @@ export default function GISRegistrationForm() {
     const { name, value, type, checked } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [name]: type === "checkbox"
-        ? checked
-          ? [...prev.skills, value]
-          : prev.skills.filter((s) => s !== value)
-        : value,
+      [name]:
+        type === "checkbox"
+          ? checked
+            ? [...prev.skills, value]
+            : prev.skills.filter((s) => s !== value)
+          : value,
     }));
+  };
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData((prev) => ({
+          ...prev,
+          profileImage: reader.result, // Store Base64 image
+        }));
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const validateForm = () => {
-    const { fullName, contactNumber, email, institution, fieldOfStudy } = formData;
+    const { fullName, contactNumber, email, institution, fieldOfStudy } =
+      formData;
     if (!fullName) return "Full Name is required.";
-    if (!contactNumber.match(/^\d{10}$/)) return "Invalid contact number. Must be 10 digits.";
-    if (!email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) return "Invalid email format.";
+    if (!contactNumber.match(/^\d{10}$/))
+      return "Invalid contact number. Must be 10 digits.";
+    if (!email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/))
+      return "Invalid email format.";
     if (!institution) return "Institution is required.";
     if (!fieldOfStudy) return "Field of study is required.";
     return null;
@@ -89,15 +108,16 @@ export default function GISRegistrationForm() {
         // body: JSON.stringify(formData),
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${localStorage.getItem("token")}`, // If using JWT
+          Authorization: `Bearer ${localStorage.getItem("token")}`, // If using JWT
         },
         body: JSON.stringify(formData),
-
       });
 
       const data = await res.json();
       if (!res.ok) {
-        const errors = Array.isArray(data.errors) ? data.errors.map(err => `${err.path}: ${err.msg}`).join(", ") : "Unknown error";
+        const errors = Array.isArray(data.errors)
+          ? data.errors.map((err) => `${err.path}: ${err.msg}`).join(", ")
+          : "Unknown error";
         return alert(`Error: ${errors}`);
       }
 
@@ -109,71 +129,263 @@ export default function GISRegistrationForm() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6 bg-white shadow-lg rounded-lg">
-      <h2 className="text-2xl font-semibold mb-4 text-center">GIS Processing Member Registration</h2>
+    <div className="min-h-full flex items-center justify-center py-5 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-screen-xl w-full space-y-8">
+        <h2 className="mt-6 text-center text-3xl font-extrabold text-blue-600">
+          GIS Processing Member Registration
+        </h2>
 
-      {step === 1 && (
-        <StepSection title="Personal Information">
-          <Input name="fullName" value={formData.fullName} onChange={handleChange} placeholder="Full Name" />
-          <Input name="dob" type="date" value={formData.dob} onChange={handleChange} />
-          <Select name="gender" value={formData.gender} onChange={handleChange} options={["Male", "Female", "Other"]} />
-          <Input name="contactNumber" value={formData.contactNumber} onChange={handleChange} placeholder="Contact Number" />
-          <Input name="email" type="email" value={formData.email} onChange={handleChange} placeholder="Email Address" />
-          <Input name="address" value={formData.address} onChange={handleChange} placeholder="Address" />
-        </StepSection>
-      )}
+        {step === 1 && (
+          <StepSection title="Personal Information">
+            <Input
+              name="fullName"
+              value={formData.fullName}
+              onChange={handleChange}
+              placeholder="Full Name"
+            />
+            <Input
+              name="email"
+              type="email"
+              value={formData.email}
+              onChange={handleChange}
+              placeholder="Email Address"
+            />
+            <Input
+              name="contactNumber"
+              value={formData.contactNumber}
+              onChange={handleChange}
+              placeholder="Contact Number"
+            />
+            <Input
+              name="dob"
+              type="date"
+              value={formData.dob}
+              onChange={handleChange}
+            />
+            <Select
+              name="gender"
+              value={formData.gender}
+              onChange={handleChange}
+              options={["Male", "Female", "Other"]}
+            />
+            <Select
+              name="nationality"
+              value={formData.nationality}
+              onChange={handleChange}
+              options={["Indian", "American", "Canadian", "Other"]}
+            />
 
-      {step === 2 && (
-        <StepSection title="Professional Information">
-          <Input name="education" value={formData.education} onChange={handleChange} placeholder="Highest Educational Qualification" />
-          <Input name="institution" value={formData.institution} onChange={handleChange} placeholder="Institution/University" />
-          <Input name="fieldOfStudy" value={formData.fieldOfStudy} onChange={handleChange} placeholder="Field of Study" />
-          <Input name="experience" value={formData.experience} onChange={handleChange} placeholder="Experience (Years)" />
-          <Input name="employer" value={formData.employer} onChange={handleChange} placeholder="Current Employer" />
-          <Input name="jobTitle" value={formData.jobTitle} onChange={handleChange} placeholder="Job Title" />
-        </StepSection>
-      )}
+            <Input
+              name="address"
+              value={formData.address}
+              onChange={handleChange}
+              placeholder="Address"
+            />
+            {/* Profile Picture Upload */}
+            <label className="block text-sm font-medium text-gray-700">
+              Upload Profile Picture
+            </label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleImageUpload}
+              className="border p-2 rounded w-full"
+            />
 
-      {step === 3 && (
-        <StepSection title="Technical Skills & Expertise">
-          <div className="grid grid-cols-2 gap-4">
-            {["QGIS", "ArcGIS", "ERDAS", "ENVI", "Global Mapper"].map(skill => (
-              <Checkbox key={skill} label={skill} name="skills" value={skill} checked={formData.skills.includes(skill)} onChange={handleChange} />
-            ))}
-          </div>
-          <Input name="otherSkills" value={formData.otherSkills} onChange={handleChange} placeholder="Other GIS Software" />
-        </StepSection>
-      )}
+            {/* Display Image Preview */}
+            {formData.profileImage && (
+              <img
+                src={formData.profileImage}
+                alt="Profile Preview"
+                className="mt-2 w-24 h-24 rounded-full border"
+              />
+            )}
+          </StepSection>
+        )}
 
-      {step === 4 && (
-        <StepSection title="Work Preferences">
-          <Select name="workMode" value={formData.workMode} onChange={handleChange} options={["Remote", "On-site", "Hybrid"]} />
-          <Select name="workType" value={formData.workType} onChange={handleChange} options={["Part-time", "Full-time", "Freelance"]} />
-          <Input name="workHours" value={formData.workHours} onChange={handleChange} placeholder="Preferred Working Hours" />
-        </StepSection>
-      )}
+        {step === 2 && (
+          <StepSection title="Professional Information">
+            <Input
+              name="education"
+              value={formData.education}
+              onChange={handleChange}
+              placeholder="Highest Educational Qualification"
+            />
+            <Input
+              name="institution"
+              value={formData.institution}
+              onChange={handleChange}
+              placeholder="Institution/University"
+            />
+            <Input
+              name="fieldOfStudy"
+              value={formData.fieldOfStudy}
+              onChange={handleChange}
+              placeholder="Field of Study"
+            />
+            <Input
+              name="experience"
+              value={formData.experience}
+              onChange={handleChange}
+              placeholder="Experience (Years)"
+            />
+            <Input
+              name="employer"
+              value={formData.employer}
+              onChange={handleChange}
+              placeholder="Current Employer"
+            />
+            <Input
+              name="jobTitle"
+              value={formData.jobTitle}
+              onChange={handleChange}
+              placeholder="Job Title"
+            />
+          </StepSection>
+        )}
 
-      {step === 5 && (
-        <StepSection title="Additional Information">
-          <Input name="linkedIn" value={formData.linkedIn} onChange={handleChange} placeholder="LinkedIn Profile" />
-          <Input name="portfolio" value={formData.portfolio} onChange={handleChange} placeholder="Portfolio" />
-          <Input name="certifications" value={formData.certifications.join(", ")} onChange={(e) => setFormData({ ...formData, certifications: e.target.value.split(",").map(item => item.trim()) })} placeholder="Enter certifications separated by commas" />
-        </StepSection>
-      )}
+        {step === 3 && (
+          <StepSection title="Technical Skills & Expertise">
+            <div className="grid grid-cols-2 gap-4">
+              {["QGIS", "ArcGIS", "ERDAS", "ENVI", "Global Mapper"].map(
+                (skill) => (
+                  <Checkbox
+                    key={skill}
+                    label={skill}
+                    name="skills"
+                    value={skill}
+                    checked={formData.skills.includes(skill)}
+                    onChange={handleChange}
+                  />
+                )
+              )}
+            </div>
+            <Input
+              name="otherSkills"
+              value={formData.otherSkills}
+              onChange={handleChange}
+              placeholder="Other GIS Software"
+            />
+          </StepSection>
+        )}
 
-      <div className="flex justify-between mt-4">
-        {step > 1 && <Button onClick={() => setStep(step - 1)} color="gray">Back</Button>}
-        {step < totalSteps ? <Button onClick={() => setStep(step + 1)} color="blue">Next</Button> : <Button onClick={handleSubmit} color="green">Submit</Button>}
+        {step === 4 && (
+          <StepSection title="Work Preferences">
+            <Select
+              name="workMode"
+              value={formData.workMode}
+              onChange={handleChange}
+              options={["Remote", "On-site", "Hybrid"]}
+            />
+            <Select
+              name="workType"
+              value={formData.workType}
+              onChange={handleChange}
+              options={["Part-time", "Full-time", "Freelance"]}
+            />
+            <Input
+              name="workHours"
+              value={formData.workHours}
+              onChange={handleChange}
+              placeholder="Preferred Working Hours"
+            />
+          </StepSection>
+        )}
+
+        {step === 5 && (
+          <StepSection title="Additional Information">
+            <Input
+              name="linkedIn"
+              value={formData.linkedIn}
+              onChange={handleChange}
+              placeholder="LinkedIn Profile"
+            />
+            <Input
+              name="portfolio"
+              value={formData.portfolio}
+              onChange={handleChange}
+              placeholder="Portfolio"
+            />
+            <Input
+              name="certifications"
+              value={formData.certifications.join(", ")}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  certifications: e.target.value
+                    .split(",")
+                    .map((item) => item.trim()),
+                })
+              }
+              placeholder="Enter certifications separated by commas"
+            />
+          </StepSection>
+        )}
+
+        <div className="flex justify-between gap-4 mt-4">
+          {step > 1 && (
+            <Button onClick={() => setStep(step - 1)} color="gray">
+              Back
+            </Button>
+          )}
+          {step < totalSteps ? (
+            <Button onClick={() => setStep(step + 1)} color="blue">
+              Next
+            </Button>
+          ) : (
+            <Button onClick={handleSubmit} color="green">
+              Submit
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
 // UI Components
-const StepSection = ({ title, children }) => <section className="mb-6"><h3 className="text-xl font-semibold mb-2">{title}</h3><div className="grid grid-cols-2 gap-4">{children}</div></section>;
-const Input = ({ name, type = "text", ...props }) => <input type={type} name={name} {...props} className="border p-2 rounded w-full" />;
-const Select = ({ name, options, ...props }) => <select name={name} {...props} className="border p-2 rounded w-full">{options.map(opt => <option key={opt} value={opt}>{opt}</option>)}</select>;
-const Checkbox = ({ label, ...props }) => <label className="flex items-center space-x-2"><input type="checkbox" {...props} className="w-4 h-4" /><span>{label}</span></label>;
-const Button = ({ onClick, color, children }) => <button onClick={onClick} className={`px-4 py-2 rounded text-white bg-${color}-500 hover:bg-${color}-600`}>{children}</button>;
+const StepSection = ({ title, children }) => (
+  <section className="mb-6">
+    <h3 className="text-xl font-semibold mb-2">{title}</h3>
+    <div className="grid grid-cols-2 gap-4">{children}</div>
+  </section>
+);
+const Input = ({ name, type = "text", ...props }) => (
+  <input
+    type={type}
+    name={name}
+    {...props}
+    className="border p-2 rounded w-full"
+  />
+);
+const Select = ({ name, options, ...props }) => (
+  <select name={name} {...props} className="border p-2 rounded w-full">
+    {options.map((opt) => (
+      <option key={opt} value={opt}>
+        {opt}
+      </option>
+    ))}
+  </select>
+);
+const Checkbox = ({ label, ...props }) => (
+  <label className="flex items-center space-x-2">
+    <input type="checkbox" {...props} className="w-4 h-4" />
+    <span>{label}</span>
+  </label>
+);
+const Button = ({ onClick, color, children }) => {
+  const colors = {
+    gray: "bg-gray-500 hover:bg-gray-600",
+    blue: "bg-blue-500 hover:bg-blue-600",
+    green: "bg-green-500 hover:bg-green-600",
+  };
 
-
+  return (
+    <button
+      onClick={onClick}
+      className={`px-4 py-2 rounded text-white ${colors[color]} border`}
+    >
+      {children}
+    </button>
+  );
+};

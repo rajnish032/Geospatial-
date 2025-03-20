@@ -2,11 +2,15 @@
 import FAQ from "@/components/faq";
 import FeatureSection from "@/components/featureSection";
 import { Feedback } from "@/components/feedback";
-import Header, { ImagesSliderDemo } from "@/components/header";
+// import Header, { ImagesSliderDemo } from "@/components/header";
 import Hero from "@/components/hero";
 
-import Register from "./account/register/page";
+
 import Footer from "@/components/footer";
+import Navbar from "@/components/navbar";
+
+import Register from "@/components/header";
+
 
 
 
@@ -52,9 +56,10 @@ export default function Home() {
   return (
     <main>
       
-      
-     <ImagesSliderDemo/>
-     <Register/>
+      <Navbar/>
+      <Register />
+      {/* <ImagesSliderDemo/> */}
+     
       <FeatureSection features={featuresData} />
       
       <Hero/>

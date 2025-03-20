@@ -3,7 +3,7 @@ import UserModel from "../models/User.js";
 import { validationResult, check } from "express-validator";
 import mongoose from "mongoose";
 
-// ✅ Middleware Validation Rules (Use in Routes)
+// ✅ Middleware: GIS Registration Validation Rules
 export const validateGISRegistration = [
   check("fullName").notEmpty().withMessage("Full Name is required"),
   check("dob").notEmpty().withMessage("Date of Birth is required"),
@@ -108,5 +108,35 @@ export const getGISMemberData = async (req, res) => {
     res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 };
+
+// @desc    Update GIS Member Data
+// @route   PUT /api/gis-registration/me
+// @access  Private
+export const updateGISMemberData = async (req, res) => {
+  try {
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ message: "Unauthorized: Please log in first" });
+    }
+
+    const memberData = await GISMember.findOneAndUpdate(
+      { user: req.user._id },
+      { $set: req.body },
+      { new: true, runValidators: true }
+    );
+
+    if (!memberData) {
+      return res.status(404).json({ message: "GIS Registration not found" });
+    }
+
+    res.status(200).json({
+      message: "GIS Data updated successfully!",
+      memberData
+    });
+  } catch (error) {
+    console.error("Error updating GIS data:", error);
+    res.status(500).json({ message: "Internal Server Error", error: error.message });
+  }
+};
+
 
 

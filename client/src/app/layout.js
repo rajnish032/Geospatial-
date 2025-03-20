@@ -1,8 +1,8 @@
 
-import Navbar from "@/components/navbar";
+
 import "./globals.css";
 import StoreProvider from "./StoreProvider";
-import Footer from "@/components/footer";
+
 
 export const metadata = {
   title: "Aero2Astro Gis",
@@ -14,7 +14,7 @@ export default function RootLayout({ children }) {
     <html lang="en">
       <body>
         <StoreProvider >
-          <Navbar/>
+          
           {children} {/* Renders the active page */}
           
         </StoreProvider>

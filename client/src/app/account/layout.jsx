@@ -1,4 +1,4 @@
-import Navbar from "@/components/navbar"
+
 
 const AccountLayout = ({ children }) => {
   return (

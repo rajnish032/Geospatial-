@@ -7,10 +7,7 @@ const userSchema = new mongoose.Schema({
   is_verified: { type: Boolean, default: false },
   isGISRegistered: { type: Boolean, default: false },
   roles: { type: [String], enum: ["user", "admin"], default: ["user"] },
-  refreshToken: { type: String }, // ✅ Added refresh token storage
-}, { timestamps: true }); // ✅ Automatically add createdAt and updatedAt timestamps
-
-// Model
-const UserModel = mongoose.model("User", userSchema); // ✅ Changed "user" to "User" for consistency
-
+  refreshToken: { type: String },
+}, { timestamps: true });
+const UserModel = mongoose.model("User", userSchema);
 export default UserModel;

@@ -71,7 +71,7 @@ export const registerGISMember = async (req, res) => {
       // ✅ Send response for frontend redirection
       res.status(201).json({
         message: "GIS Registration successful! Redirecting to profile...",
-        redirectTo: "/profile",
+        redirectTo: "user/profile",
         memberId: newMember._id,
       });
 

@@ -3,7 +3,7 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 // Define a service using a base URL and expected endpoints
 export const authApi = createApi({
   reducerPath: 'authApi',
-  baseQuery: fetchBaseQuery({ baseUrl: 'http://localhost:8000/api/user/' }), // ✅ Ensure correct base URL
+  baseQuery: fetchBaseQuery({ baseUrl: 'http://localhost:8000/api/user/' }), 
   endpoints: (builder) => ({
     createUser: builder.mutation({
       query: (user) => ({
@@ -29,7 +29,7 @@ export const authApi = createApi({
         method: 'POST',
         body: user,
         headers: { 'Content-type': 'application/json' },
-        credentials: 'include'  // ✅ Required to send authentication cookies
+        credentials: 'include'
       }),
       transformResponse: (response) => {
         if (response.status === "success") {
@@ -37,7 +37,7 @@ export const authApi = createApi({
             ...response,
             user: {
               ...response.user,
-              isGISRegistered: response.user.isGISRegistered || false  // ✅ Ensure this value exists
+              isGISRegistered: response.user.isGISRegistered || false  
             }
           };
         }
@@ -49,7 +49,7 @@ export const authApi = createApi({
       query: () => ({
         url: `me`,
         method: 'GET',
-        credentials: 'include' // ✅ Ensure authentication works
+        credentials: 'include'
       }),
       transformResponse: (response) => ({
         ...response,
@@ -64,7 +64,7 @@ export const authApi = createApi({
       query: () => ({
         url: `logout`,
         method: 'POST',
-        credentials: 'include' // ✅ Include authentication cookies
+        credentials: 'include' 
       })
     }),
 
@@ -81,7 +81,7 @@ export const authApi = createApi({
       query: (data) => {
         const { id, token, ...values } = data;
         return {
-          url: `reset-password/${id}/${token}`, // ✅ Fixed incorrect URL formatting
+          url: `reset-password/${id}/${token}`,
           method: 'POST',
           body: values,
           headers: { 'Content-type': 'application/json' }
@@ -94,13 +94,13 @@ export const authApi = createApi({
         url: 'change-password',
         method: 'POST',
         body: actualData,
-        credentials: 'include' // ✅ Ensure authentication works
+        credentials: 'include'
       })
     })
   })
 });
 
-// Export hooks for using the API
+
 export const { 
   useCreateUserMutation, 
   useVerifyEmailMutation, 

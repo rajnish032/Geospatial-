@@ -1,7 +1,9 @@
 
 
+import Navbar from "@/components/navbar";
 import "./globals.css";
 import StoreProvider from "./StoreProvider";
+
 
 
 export const metadata = {
@@ -14,7 +16,7 @@ export default function RootLayout({ children }) {
     <html lang="en">
       <body>
         <StoreProvider >
-          
+      
           {children} {/* Renders the active page */}
           
         </StoreProvider>

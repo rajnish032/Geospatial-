@@ -215,7 +215,7 @@ class UserController {
           email: user.email,
           name: user.name,
           roles: user.roles[0],
-          isGISRegistered: user.isGISRegistered || false, // 🆕 Add isGISRegistered field
+          isGISRegistered: user.isGISRegistered || false,
         },
         status: "success",
         message: "Login successful",
@@ -223,7 +223,7 @@ class UserController {
         refresh_token: refreshToken,
         access_token_exp: accessTokenExp,
         is_auth: true,
-        redirectTo: user.isGISRegistered ? "/profile" : "/gis-registration", // ✅ Add redirection logic
+        redirectTo: user.isGISRegistered ? "/profile" : "/gis-registration",
       });
     } catch (error) {
       console.error(error);

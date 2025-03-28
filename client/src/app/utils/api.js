@@ -1,11 +1,11 @@
-const API_BASE_URL = "http://localhost:8000/api/auth"; // ✅ Updated Base URL
+const API_BASE_URL = "http://localhost:8000/api/auth"; // 
 
 export const sendOtp = async (phone, type) => {
   try {
     const response = await fetch(`${API_BASE_URL}/send-otp`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      credentials: "include", // ✅ Include cookies for authentication
+      credentials: "include",
       body: JSON.stringify({ phone, type }),
     });
 

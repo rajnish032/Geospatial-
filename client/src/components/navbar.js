@@ -1,109 +1,203 @@
 "use client";
 import Link from "next/link";
 import { useState } from "react";
+import { usePathname } from "next/navigation";
+import Image from "next/image";
 
-export default function Navbar() {
+export default function Navbar({ toggleTheme, theme }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const pathname = usePathname();
+
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
 
   // Navigation items array
   const navItems = [
-    { name: "HOMEe", href: "/" },
-    { name: "ABOUT", href: "/about" },
-    { name: "PARTNERS", href: "/partners" },
+    { name: "Home", href: "/" },
+    { name: "About", href: "/about" },
+    { name: "Partners", href: "/partners" },
     { name: "FAQ's", href: "/faq" },
     { name: "Profile", href: "/profile" },
   ];
 
   return (
-    <div>
-      <nav className="block w-full max-w-screen px-4 py-4 mx-auto bg-black bg-opacity-95 sticky top-3 shadow lg:px-8 backdrop-blur-lg backdrop-saturate-150 z-[9999]">
-        <div className="container flex flex-wrap items-center justify-between mx-auto text-slate-800">
-          <Link href="/" className="mr-4 block cursor-pointer py-1.5 text-red-50 font-bold text-2xl">
-            <img
-              src="/Logo_Png-09_sifemw.png"
-              alt="Logo"
-              className="h-12 w-auto max-w-full sm:h-16"
-            />
-          </Link>
+    <nav className="w-full px-4 py-3 mx-auto bg-gray-800/80 backdrop-blur-lg sticky top-0 z-[9999] shadow-lg lg:px-8 transition-all duration-300">
+      <div className="container flex items-center justify-between mx-auto">
+        {/* Logo */}
+        <Link href="/">
+          <Image
+            src="/Logo_Png-09_sifemw.png"
+            alt="Aero2Astro Logo"
+            width={150}
+            height={48}
+            className="h-10 w-auto sm:h-12 transition-transform duration-300 hover:scale-105"
+            priority
+          />
+        </Link>
 
-          <div className="lg:hidden">
-            <button
-              className="relative ml-auto h-6 w-6 select-none rounded-lg text-center align-middle text-xs font-medium uppercase transition-all hover:bg-transparent focus:bg-transparent active:bg-transparent disabled:pointer-events-none disabled:opacity-50"
-              onClick={toggleMobileMenu}
-              type="button"
+        {/* Mobile Menu Toggle */}
+        <div className="lg:hidden">
+          <button
+            onClick={toggleMobileMenu}
+            className="relative p-2 rounded-lg text-primary hover:bg-gray-700/50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors duration-200"
+            aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
+            aria-expanded={isMobileMenuOpen}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-6 h-6"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              viewBox="0 0 24 24"
             >
-              <span className="absolute transform -translate-x-1/2 -translate-y-1/2 top-1/2 left-1/2">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="w-8 h-8"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
-              </span>
+              {isMobileMenuOpen ? (
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+              )}
+            </svg>
+          </button>
+        </div>
+
+        {/* Mobile Menu */}
+        <div
+          className={`fixed top-0 left-0 min-h-screen w-72 bg-gray-800/95 backdrop-blur-lg shadow-2xl transform transition-transform duration-300 ease-in-out ${
+            isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+          } lg:hidden z-50`}
+        >
+          <div className="flex items-center justify-between p-4 border-b border-gray-700">
+            <Link href="/">
+              <Image
+                src="/Logo_Png-09_sifemw.png"
+                alt="Aero2Astro Logo"
+                width={120}
+                height={40}
+                className="h-10 w-auto transition-transform duration-300 hover:scale-105"
+                priority
+              />
+            </Link>
+            <button
+              onClick={toggleMobileMenu}
+              className="p-2 text-primary hover:text-red-500 transition-colors duration-200"
+              aria-label="Close menu"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
             </button>
           </div>
-
-          {/* Mobile Menu */}
-          <div
-            className={`fixed top-0 left-0 min-h-screen w-64 bg-gray-800 shadow-lg transform transition-transform duration-300 ease-in-out ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"} lg:hidden z-50`}
-          >
-            <div className="flex flex-row items-center border-b pb-4 bg-black">
-              <Link href="/" className="cursor-pointer text-red-50 font-bold text-xl pt-4 ps-4">
-                AERO2ASTRO
-              </Link>
-              <button
-                onClick={toggleMobileMenu}
-                className="absolute top-4 right-4 text-slate-600 hover:text-red-500"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="w-8 h-8"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
+          <ul className="flex flex-col gap-4 p-6">
+            {navItems.map((item, index) => (
+              <li key={index}>
+                <Link
+                  href={item.href}
+                  className={`block py-2 px-4 text-lg font-medium ${
+                    pathname === item.href
+                      ? "text-primary bg-gray-700/50"
+                      : "text-white hover:text-blue-300 hover:bg-gray-700/50"
+                  } rounded-lg transition-all duration-200`}
+                  onClick={toggleMobileMenu}
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <ul className="flex flex-col h-full gap-4 p-4">
-              {navItems.map((item, index) => (
-                <li key={index} className="flex items-center p-1 text-lg gap-x-2 text-slate-50 hover:text-red-500">
-                  <Link href={item.href} className="flex items-center ">
-                    {item.name}
-                  </Link>
-                </li>
-              ))}
-              <li className="mt-4">
-                <button className="bg-blue-600 text-white px-8 py-2 rounded-md hover:bg-red-500">Login</button>
+                  {item.name}
+                </Link>
               </li>
-            </ul>
-          </div>
-
-          {/* Desktop Menu */}
-          <div className="hidden lg:block">
-            <ul className="flex flex-col gap-2 mt-2 mb-4 lg:mb-0 lg:mt-0 lg:flex-row lg:items-center lg:gap-6">
-              {navItems.map((item, index) => (
-                <li key={index} className="flex items-center p-1 text-lg gap-x-2 text-slate-50 hover:text-red-500">
-                  <Link href={item.href} className="flex items-center">
-                    {item.name}
-                  </Link>
-                </li>
-              ))}
-              <li>
-                <button className="bg-blue-600 hover:bg-blue-600 text-white px-8 py-2 rounded-md">Login</button>
-              </li>
-            </ul>
-          </div>
+            ))}
+            <li className="mt-4">
+              <Link
+                href="/account/login"
+                className="block w-full text-center bg-primary hover:bg-blue-500 text-white font-semibold py-2 px-6 rounded-lg transition-all duration-200"
+              >
+                Login
+              </Link>
+            </li>
+          </ul>
         </div>
-      </nav>
-    </div>
+
+        {/* Desktop Menu */}
+        <div className="hidden lg:flex items-center space-x-6">
+          <ul className="flex items-center gap-6">
+            {navItems.map((item, index) => (
+              <li key={index}>
+                <Link
+                  href={item.href}
+                  className={`text-lg font-medium relative group ${
+                    pathname === item.href ? "text-primary" : "text-white hover:text-blue-300"
+                  } transition-colors duration-200`}
+                >
+                  {item.name}
+                  <span
+                    className={`absolute left-0 bottom-0 h-0.5 bg-primary transition-all duration-300 ${
+                      pathname === item.href ? "w-full" : "w-0 group-hover:w-full"
+                    }`}
+                  ></span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+          <Link
+            href="/account/login"
+            className="bg-primary hover:bg-blue-500 text-white font-semibold py-2 px-6 rounded-lg transition-all duration-200"
+          >
+            Login
+          </Link>
+          {/* Theme Toggle Button */}
+          <button
+            onClick={toggleTheme}
+            className="p-2 rounded-full bg-gray-700 hover:bg-gray-600 text-primary transition-colors duration-200"
+            aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+          >
+            {theme === "dark" ? (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="w-5 h-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
+                />
+              </svg>
+            ) : (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="w-5 h-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
+                />
+              </svg>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Mobile Menu Overlay */}
+      {isMobileMenuOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm lg:hidden z-40"
+          onClick={toggleMobileMenu}
+          aria-hidden="true"
+        ></div>
+      )}
+    </nav>
   );
 }
-

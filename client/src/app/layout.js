@@ -1,6 +1,4 @@
 
-
-import Navbar from "@/components/navbar";
 import "./globals.css";
 import StoreProvider from "./StoreProvider";
 

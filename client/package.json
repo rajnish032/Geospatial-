@@ -27,7 +27,7 @@
     "js-cookie": "^3.0.5",
     "lodash.debounce": "^4.0.8",
     "lucide-react": "^0.477.0",
-    "motion": "^12.4.10",
+    "motion": "^12.6.2",
     "next": "15.1.7",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

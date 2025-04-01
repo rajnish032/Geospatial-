@@ -1,126 +1,134 @@
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
-import dotenv from 'dotenv';
-import createError from 'http-errors';
+import dotenv from "dotenv";
+import createError from "http-errors";
 
 dotenv.config();
 
 // Enhanced JWT verification function
-const verifyJWT = (token) => {
+const verifyJWT = (token, secret) => {
   try {
-    return jwt.verify(token, process.env.JWT_ACCESS_TOKEN_SECRET_KEY);
+    return jwt.verify(token, secret);
   } catch (error) {
     if (error.name === "TokenExpiredError") {
-      throw createError(401, 'Token expired, please log in again');
+      throw createError(401, "Token expired, please log in again");
     }
-    throw createError(401, 'Invalid token');
+    if (error.name === "JsonWebTokenError") {
+      throw createError(401, "Invalid token");
+    }
+    throw createError(401, "Token verification failed");
   }
 };
 
+// Protect middleware for JWT authentication
 export const protect = async (req, res, next) => {
-  // Debugging logs only in development
-  if (process.env.NODE_ENV === 'development') {
-    console.log("Incoming Authorization Header:", req.headers.authorization);
-  }
-
-  let token;
-
-  // Check for token in multiple locations
-  if (
-    req.headers.authorization && 
-    req.headers.authorization.startsWith("Bearer")
-  ) {
-    token = req.headers.authorization.split(" ")[1];
-  } else if (req.cookies?.accessToken) {
-    token = req.cookies.accessToken;
-  }
-
-  if (!token) {
-    if (process.env.NODE_ENV === 'development') {
-      console.log("No token found in request");
-    }
-    return next(createError(401, 'Not authorized, no token provided'));
-  }
-
   try {
+    // Log headers in development for debugging
+    if (process.env.NODE_ENV === "development") {
+      console.log("Incoming Authorization Header:", req.headers.authorization);
+      console.log("Incoming Cookies:", req.cookies);
+    }
+
+    let token;
+    // Check for token in Authorization header or cookies
+    if (req.headers.authorization?.startsWith("Bearer")) {
+      token = req.headers.authorization.split(" ")[1];
+    } else if (req.cookies?.accessToken) {
+      token = req.cookies.accessToken;
+    }
+
+    if (!token) {
+      throw createError(401, "Not authorized, no token provided");
+    }
+
     // Verify token
-    const decoded = verifyJWT(token);
-    
-    if (process.env.NODE_ENV === 'development') {
+    const decoded = verifyJWT(token, process.env.JWT_ACCESS_TOKEN_SECRET_KEY);
+
+    if (process.env.NODE_ENV === "development") {
       console.log("Decoded token payload:", decoded);
     }
 
-    // Get user and attach to request
+    // Fetch user and attach to request
     const user = await User.findById(decoded._id).select("-password -refreshToken");
-    
     if (!user) {
-      return next(createError(401, 'User not found, authorization denied'));
+      throw createError(401, "User not found, authorization denied");
     }
 
-    // // Check if user is active
+    // Optional: Uncomment to enforce active status
     // if (!user.isActive) {
-    //   return next(createError(403, 'User account is inactive'));
+    //   throw createError(403, "User account is inactive");
     // }
 
-    // Attach user to request
     req.user = user;
-    
-    // Proceed to next middleware
     next();
   } catch (error) {
-    // Enhanced error logging
-    if (process.env.NODE_ENV === 'development') {
+    if (process.env.NODE_ENV === "development") {
       console.error("Authentication Error:", {
-        error: error.message,
+        message: error.message,
         stack: error.stack,
-        token: token
+        token: req.headers.authorization || req.cookies?.accessToken,
       });
     }
 
-    // Handle specific JWT errors
-    if (error.name === 'JsonWebTokenError') {
-      return next(createError(401, 'Invalid token'));
-    }
-    if (error.name === 'TokenExpiredError') {
-      return next(createError(401, 'Token expired, please log in again'));
-    }
-
-    // Pass other errors to error handler
-    next(error);
+    // Ensure JSON response
+    res.status(error.status || 500).json({
+      success: false,
+      message: error.message,
+      ...(process.env.NODE_ENV === "development" && { error: error.stack }),
+    });
   }
 };
 
 // Role-based authorization middleware
 export const authorize = (...roles) => {
   return (req, res, next) => {
-    if (!roles.includes(req.user.role)) {
-      return next(
-        createError(403, `User role ${req.user.role} is not authorized to access this route`)
-      );
+    try {
+      if (!req.user) {
+        throw createError(401, "Authentication required");
+      }
+      if (!roles.includes(req.user.role)) {
+        throw createError(403, `User role ${req.user.role} is not authorized to access this route`);
+      }
+      next();
+    } catch (error) {
+      res.status(error.status || 500).json({
+        success: false,
+        message: error.message,
+        ...(process.env.NODE_ENV === "development" && { error: error.stack }),
+      });
     }
-    next();
   };
 };
 
-// Optional: Token refresh verification middleware
+// Refresh token verification middleware
 export const verifyRefresh = async (req, res, next) => {
-  const { refreshToken } = req.cookies;
-  
-  if (!refreshToken) {
-    return next(createError(401, 'No refresh token provided'));
-  }
-
   try {
-    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_TOKEN_SECRET_KEY);
+    const { refreshToken } = req.cookies;
+    if (!refreshToken) {
+      throw createError(401, "No refresh token provided");
+    }
+
+    const decoded = verifyJWT(refreshToken, process.env.JWT_REFRESH_TOKEN_SECRET_KEY);
     const user = await User.findById(decoded._id);
 
     if (!user || user.refreshToken !== refreshToken) {
-      return next(createError(403, 'Invalid refresh token'));
+      throw createError(403, "Invalid refresh token");
     }
 
     req.user = user;
     next();
   } catch (error) {
-    next(createError(401, 'Invalid refresh token'));
+    if (process.env.NODE_ENV === "development") {
+      console.error("Refresh Token Error:", {
+        message: error.message,
+        stack: error.stack,
+      });
+    }
+
+    res.status(error.status || 500).json({
+      success: false,
+      message: error.message,
+      ...(process.env.NODE_ENV === "development" && { error: error.stack }),
+    });
   }
 };

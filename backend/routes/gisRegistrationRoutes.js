@@ -18,63 +18,67 @@ import {
   validateDraftFileUploads,
 } from "../middlewares/draftValidationMiddleware.js";
 
+const router = express.Router();
+
+// Multer storage configuration
 const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
+  destination: (req, file, cb) => {
     cb(null, "uploads/");
   },
-  filename: function (req, file, cb) {
+  filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
     cb(
       null,
-      file.fieldname +
-        "-" +
-        uniqueSuffix +
-        "." +
-        file.originalname.split(".").pop()
+      `${file.fieldname}-${uniqueSuffix}.${file.originalname.split(".").pop()}`
     );
   },
 });
 
+// File filter for allowed types
 const fileFilter = (req, file, cb) => {
-  if (
-    file.mimetype === "image/jpeg" ||
-    file.mimetype === "image/png" ||
-    file.mimetype === "application/pdf" ||
-    file.mimetype === "application/msword" ||
-    file.mimetype ===
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-  ) {
+  const allowedTypes = [
+    "image/jpeg",
+    "image/png",
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ];
+  if (allowedTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
     cb(
       new Error(
-        "Invalid file type. Only images, PDFs, and documents are allowed."
+        "Invalid file type. Only JPEG, PNG, PDF, and Word documents are allowed."
       ),
       false
     );
   }
 };
 
+// Multer instances
 const upload = multer({
-  storage: storage,
-  limits: {
-    fileSize: 5 * 1024 * 1024,
-    files: 10, // Maximum 10 files
-  },
-  fileFilter: fileFilter,
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024, files: 10 }, // 5MB, 10 files max
+  fileFilter,
 });
 
 const draftUpload = multer({
-  storage: storage,
-  limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit for drafts
-    files: 10,
-  },
-  fileFilter: fileFilter,
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024, files: 10 }, // 10MB, 10 files max
+  fileFilter,
 });
 
-const router = express.Router();
+// Multer error handler middleware
+const multerErrorHandler = (err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    return res.status(400).json({ message: `Multer error: ${err.message}` });
+  } else if (err) {
+    return res.status(400).json({ message: err.message });
+  }
+  next();
+};
 
+// Routes
 router.get("/draft", protect, checkForDraft);
 
 router.put(
@@ -85,6 +89,7 @@ router.put(
     { name: "workSamples", maxCount: 10 },
     { name: "certificationFile", maxCount: 1 },
   ]),
+  multerErrorHandler,
   validateDraftFileUploads,
   validateDraftGISRegistration,
   validateRequest,
@@ -101,6 +106,7 @@ router.post(
     { name: "workSamples", maxCount: 10 },
     { name: "certificationFile", maxCount: 1 },
   ]),
+  multerErrorHandler,
   validateGISRegistration,
   validateRequest,
   registerGISMember
@@ -116,6 +122,7 @@ router.put(
     { name: "workSamples", maxCount: 10 },
     { name: "certificationFile", maxCount: 1 },
   ]),
+  multerErrorHandler,
   updateGISMemberData
 );
 

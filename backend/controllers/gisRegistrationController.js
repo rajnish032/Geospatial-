@@ -1,9 +1,10 @@
 import GISMember from "../models/GISMemberRegistration.js";
-import fs from "fs";
+import fs from "fs/promises"; // Use promises for cleaner async file operations
 import UserModel from "../models/User.js";
 import { validationResult, check } from "express-validator";
 import mongoose from "mongoose";
 
+// Validation middleware for GIS registration
 export const validateGISRegistration = [
   check("fullName").notEmpty().withMessage("Full Name is required"),
   check("dob").notEmpty().withMessage("Date of Birth is required"),
@@ -12,24 +13,26 @@ export const validateGISRegistration = [
     .withMessage("Invalid gender"),
   check("contactNumber")
     .matches(/^\d{10}$/)
-    .withMessage("Invalid contact number"),
+    .withMessage("Invalid contact number (must be 10 digits)"),
   check("email").isEmail().withMessage("Invalid email format"),
   check("address").notEmpty().withMessage("Address is required"),
   check("pinCode")
     .matches(/^\d{6}$/)
-    .withMessage("Invalid pin code"),
+    .withMessage("Invalid pin code (must be 6 digits)"),
   check("city").notEmpty().withMessage("City is required"),
   check("state").notEmpty().withMessage("State is required"),
   check("institution").notEmpty().withMessage("Institution is required"),
   check("fieldOfStudy").notEmpty().withMessage("Field of Study is required"),
   check("projects")
     .isArray({ min: 3 })
-    .withMessage("At least 3 projects required"),
+    .withMessage("At least 3 projects are required"),
   check("projects.*.title").notEmpty().withMessage("Project title is required"),
   check("projects.*.description")
     .notEmpty()
     .withMessage("Project description is required"),
-  check("acceptTerms").equals("true").withMessage("You must accept the terms"), // Adjust if sent as boolean
+  check("acceptTerms")
+    .custom((value) => value === "true" || value === true)
+    .withMessage("You must accept the terms"),
   check("availableEquipment.*")
     .optional()
     .isIn([
@@ -44,12 +47,14 @@ export const validateGISRegistration = [
     .withMessage("Invalid equipment value"),
 ];
 
+// Register a new GIS member
 export const registerGISMember = async (req, res) => {
   const session = await mongoose.startSession();
   try {
     session.startTransaction();
 
-    if (!req.user?._id) {
+    const userId = req.user?._id;
+    if (!userId) {
       throw new Error("Unauthorized: Please log in first");
     }
 
@@ -58,72 +63,59 @@ export const registerGISMember = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "Validation failed",
-        errors: errors.array()
+        errors: errors.array(),
       });
     }
 
     // Parse availableEquipment from FormData
-    const availableEquipment = [];
-    for (let key in req.body) {
-      if (key.startsWith('availableEquipment[')) {
-        const index = parseInt(key.match(/\[(\d+)\]/)[1]);
-        const value = req.body[key].trim();
-        if (value) {
-          availableEquipment[index] = value;
-        }
-      }
-    }
+    const availableEquipment = Object.keys(req.body)
+      .filter((key) => key.startsWith("availableEquipment["))
+      .map((key) => req.body[key].trim())
+      .filter(Boolean);
 
     const filePaths = {
       profileImage: req.files?.profileImage?.[0]?.path,
-      workSamples: req.files?.workSamples?.map(f => f.path),
-      certificationFile: req.files?.certificationFile?.[0]?.path
+      workSamples: req.files?.workSamples?.map((f) => f.path),
+      certificationFile: req.files?.certificationFile?.[0]?.path,
     };
 
     // Check for existing non-draft registration
-    const existing = await GISMember.findOne({ 
-      user: req.user._id,
-      isDraft: false 
+    const existing = await GISMember.findOne({
+      user: userId,
+      isDraft: false,
     }).session(session);
-
     if (existing) {
       throw new Error("GIS Registration already completed");
     }
 
-    // Clean req.body of FormData keys and _id
-    const memberData = { ...req.body };
-    Object.keys(memberData).forEach(key => {
-      if (key.startsWith('availableEquipment[') || key === '_id') {
-        delete memberData[key];
-      }
-    });
-
-    // Add parsed availableEquipment and other fields
-    memberData.availableEquipment = availableEquipment.filter(Boolean);
-    Object.assign(memberData, filePaths, {
+    // Clean and prepare member data
+    const memberData = {
+      ...req.body,
+      availableEquipment,
+      ...filePaths,
       isDraft: false,
       submittedAt: new Date(),
-      user: req.user._id
-    });
+      user: userId,
+    };
+    ["_id", ...Object.keys(req.body).filter((k) => k.startsWith("availableEquipment["))].forEach(
+      (key) => delete memberData[key]
+    );
 
-    // Debugging: Log memberData
-    console.log('memberData:', memberData);
-
-    // If a draft exists, update it; otherwise, create new
+    // Update draft or create new
     let newMember;
-    const draft = await GISMember.findOne({ user: req.user._id, isDraft: true }).session(session);
+    const draft = await GISMember.findOne({ user: userId, isDraft: true }).session(session);
     if (draft) {
       newMember = await GISMember.findOneAndUpdate(
-        { user: req.user._id, isDraft: true },
+        { user: userId, isDraft: true },
         { $set: memberData },
         { new: true, session }
       );
     } else {
-      [newMember] = await GISMember.create([memberData], { session });
+      newMember = await GISMember.create(memberData, { session });
     }
 
     await UserModel.findByIdAndUpdate(
-      req.user._id,
+      userId,
       { isGISRegistered: true },
       { session }
     );
@@ -135,68 +127,68 @@ export const registerGISMember = async (req, res) => {
       message: "Registration successful",
       data: {
         memberId: newMember._id,
-        redirectTo: "/user/profile"
-      }
+        redirectTo: "/user/profile",
+      },
     });
   } catch (error) {
     await session.abortTransaction();
-    console.error("Registration error:", error);
 
     if (req.files) {
-      Object.values(req.files).flat().forEach(file => {
-        fs.unlink(file.path, err => err && console.error("File cleanup error:", err));
-      });
+      await Promise.all(
+        Object.values(req.files)
+          .flat()
+          .map((file) => fs.unlink(file.path).catch((err) => console.error("File cleanup error:", err)))
+      );
     }
 
-    const status = error.message.includes("Unauthorized") ? 401 : 
-                  error.message.includes("Validation") ? 400 : 
-                  error.message.includes("already") ? 409 : 500;
-    
+    const status = {
+      Unauthorized: 401,
+      Validation: 400,
+      already: 409,
+    }[error.message.split(" ")[0]] || 500;
+
     res.status(status).json({
       success: false,
       message: error.message,
-      error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      ...(process.env.NODE_ENV === "development" && { error: error.stack }),
     });
   } finally {
     session.endSession();
   }
 };
 
+// Update GIS member data
 export const updateGISMemberData = async (req, res) => {
   try {
-    if (!req.user || !req.user._id) {
-      return res
-        .status(401)
-        .json({ message: "Unauthorized: Please log in first" });
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized: Please log in first",
+      });
     }
 
     // Parse savedTabs from FormData
-    const savedTabs = [];
-    for (let key in req.body) {
-      if (key.startsWith("savedTabs[")) {
-        const index = parseInt(key.match(/\[(\d+)\]/)[1]);
-        savedTabs[index] = parseInt(req.body[key]);
-      }
-    }
+    const savedTabs = Object.keys(req.body)
+      .filter((key) => key.startsWith("savedTabs["))
+      .map((key) => parseInt(req.body[key]))
+      .filter((num) => !isNaN(num));
 
-    const updates = { ...req.body };
+    const updates = {
+      ...req.body,
+      ...(savedTabs.length > 0 && { savedTabs }),
+      ...(req.files?.profileImage && { profileImage: req.files.profileImage[0].path }),
+      ...(req.files?.workSamples && { workSamples: req.files.workSamples.map((file) => file.path) }),
+      ...(req.files?.certificationFile && {
+        certificationFile: req.files.certificationFile[0].path,
+      }),
+    };
     Object.keys(updates).forEach((key) => {
       if (key.startsWith("savedTabs[")) delete updates[key];
     });
-    if (savedTabs.length > 0) updates.savedTabs = savedTabs;
-
-    if (req.files?.profileImage?.[0]?.path) {
-      updates.profileImage = req.files.profileImage[0].path;
-    }
-    if (req.files?.workSamples) {
-      updates.workSamples = req.files.workSamples.map((file) => file.path);
-    }
-    if (req.files?.certificationFile?.[0]?.path) {
-      updates.certificationFile = req.files.certificationFile[0].path;
-    }
 
     const memberData = await GISMember.findOneAndUpdate(
-      { user: req.user._id },
+      { user: userId },
       { $set: updates },
       {
         new: true,
@@ -206,130 +198,136 @@ export const updateGISMemberData = async (req, res) => {
     );
 
     if (!memberData) {
-      return res.status(404).json({ message: "GIS Registration not found" });
+      return res.status(404).json({
+        success: false,
+        message: "GIS Registration not found",
+      });
     }
 
     res.status(200).json({
-      message: "GIS Data updated successfully!",
-      memberData,
+      success: true,
+      message: "GIS Data updated successfully",
+      data: memberData,
     });
   } catch (error) {
     console.error("Error updating GIS data:", error);
     res.status(500).json({
-      message: "Internal Server Error",
-      error: error.message,
+      success: false,
+      message: "Failed to update GIS data",
+      error: process.env.NODE_ENV === "development" ? error.stack : undefined,
     });
   }
 };
 
+// Check for existing draft
 export const checkForDraft = async (req, res) => {
   try {
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized: Please log in first",
+      });
+    }
+
     const draft = await GISMember.findOne({
-      user: req.user._id,
+      user: userId,
       isDraft: true,
     }).select("-__v -createdAt -updatedAt");
 
     res.status(200).json({
+      success: true,
       exists: !!draft,
-      draftData: draft,
+      draftData: draft || null,
     });
   } catch (error) {
+    console.error("Error checking for draft:", error);
     res.status(500).json({
-      message: "Error checking for draft",
-      error: error.message,
+      success: false,
+      message: "Failed to check for draft",
+      error: process.env.NODE_ENV === "development" ? error.stack : undefined,
     });
   }
 };
 
+// Save draft
 export const saveDraft = async (req, res) => {
   const session = await mongoose.startSession();
   try {
     session.startTransaction();
 
-    if (!req.user?._id) {
-      throw new Error("Unauthorized");
+    const userId = req.user?._id;
+    if (!userId) {
+      throw new Error("Unauthorized: Please log in first");
     }
 
-    // Parse savedTabs from FormData
-    const savedTabs = [];
-    for (let key in req.body) {
-      if (key.startsWith("savedTabs[")) {
-        const index = parseInt(key.match(/\[(\d+)\]/)[1]);
-        savedTabs[index] = parseInt(req.body[key]); // Convert to number
-      }
-    }
-
-    // Add activeTab to savedTabs if not already present
+    // Parse savedTabs
+    const savedTabs = Object.keys(req.body)
+      .filter((key) => key.startsWith("savedTabs["))
+      .map((key) => parseInt(req.body[key]))
+      .filter((num) => !isNaN(num));
     const activeTab = parseInt(req.body.activeTab) || 1;
-    if (!savedTabs.includes(activeTab)) {
-      savedTabs.push(activeTab);
-    }
+    if (!savedTabs.includes(activeTab)) savedTabs.push(activeTab);
 
-    // Parse projects from FormData
+    // Parse projects
     const projects = [];
-    const projectKeys = Object.keys(req.body).filter((k) =>
-      k.startsWith("projects[")
-    );
-    projectKeys.forEach((key) => {
-      const match = key.match(/projects\[(\d+)\]\[(\w+)\]/);
-      if (match) {
-        const index = parseInt(match[1]);
-        const field = match[2];
-        if (!projects[index]) projects[index] = {};
-        projects[index][field] = req.body[key];
-      }
-    });
+    Object.keys(req.body)
+      .filter((k) => k.startsWith("projects["))
+      .forEach((key) => {
+        const match = key.match(/projects\[(\d+)\]\[(\w+)\]/);
+        if (match) {
+          const index = parseInt(match[1]);
+          const field = match[2];
+          projects[index] = projects[index] || {};
+          projects[index][field] = req.body[key];
+        }
+      });
 
-    // Prepare file updates
-    const fileUpdates = {};
-    if (req.files?.profileImage) {
-      fileUpdates.profileImage = req.files.profileImage[0].path;
-      const old = await GISMember.findOne({ user: req.user._id }).select(
-        "profileImage"
-      );
-      if (old?.profileImage) {
-        fs.unlink(old.profileImage, () => {});
-      }
-    }
-    if (req.files?.workSamples) {
-      fileUpdates.workSamples = req.files.workSamples.map((file) => file.path);
-    }
-    if (req.files?.certificationFile) {
-      fileUpdates.certificationFile = req.files.certificationFile[0].path;
+    // File updates
+    const fileUpdates = {
+      ...(req.files?.profileImage && { profileImage: req.files.profileImage[0].path }),
+      ...(req.files?.workSamples && { workSamples: req.files.workSamples.map((file) => file.path) }),
+      ...(req.files?.certificationFile && {
+        certificationFile: req.files.certificationFile[0].path,
+      }),
+    };
+
+    if (fileUpdates.profileImage) {
+      const old = await GISMember.findOne({ user: userId }).select("profileImage");
+      if (old?.profileImage) await fs.unlink(old.profileImage).catch(() => {});
     }
 
-    // Clean up req.body and prepare update data
-    const updateData = { ...req.body };
+    // Prepare update data
+    const updateData = {
+      ...req.body,
+      savedTabs,
+      projects: projects.filter((p) => p?.title),
+      lastSavedTab: activeTab,
+      isDraft: req.body.isDraft !== "false", // Handle string "true"/"false" or boolean
+      user: userId,
+      ...fileUpdates,
+    };
     Object.keys(updateData).forEach((key) => {
-      if (key.startsWith("savedTabs[") || key.startsWith("projects[")) {
-        delete updateData[key];
-      }
+      if (key.startsWith("savedTabs[") || key.startsWith("projects[")) delete updateData[key];
     });
 
-    // Add parsed data
-    updateData.savedTabs = savedTabs;
-    updateData.projects = projects.filter((p) => p && p.title); // Filter incomplete projects
-    updateData.lastSavedTab = activeTab;
-    updateData.isDraft = req.body.isDraft === "true";
-    Object.assign(updateData, fileUpdates);
-
-    // Update the draft
     const draft = await GISMember.findOneAndUpdate(
-      { user: req.user._id, isDraft: true },
+      { user: userId, isDraft: true },
       { $set: updateData },
       {
         new: true,
         upsert: true,
         session,
         setDefaultsOnInsert: true,
-        runValidators: false, // Adjust based on your validation needs
+        runValidators: false, // Drafts may not need full validation
       }
     );
 
     await session.commitTransaction();
 
-    res.json({
+    res.status(200).json({
       success: true,
+      message: "Draft saved successfully",
       data: {
         draftId: draft._id,
         savedTabs: draft.savedTabs,
@@ -338,32 +336,29 @@ export const saveDraft = async (req, res) => {
     });
   } catch (error) {
     await session.abortTransaction();
-    console.error("Draft save error:", error);
 
-    // Clean up uploaded files on error
     if (req.files) {
-      Object.values(req.files)
-        .flat()
-        .forEach((file) => {
-          fs.unlink(
-            file.path,
-            (err) => err && console.error("File cleanup error:", err)
-          );
-        });
+      await Promise.all(
+        Object.values(req.files)
+          .flat()
+          .map((file) => fs.unlink(file.path).catch((err) => console.error("File cleanup error:", err)))
+      );
     }
 
-    res.status(error.message === "Unauthorized" ? 401 : 500).json({
+    res.status(error.message.includes("Unauthorized") ? 401 : 500).json({
       success: false,
       message: error.message,
+      ...(process.env.NODE_ENV === "development" && { error: error.stack }),
     });
   } finally {
     session.endSession();
   }
 };
 
+// Get GIS member data
 export const getGISMemberData = async (req, res) => {
   try {
-    const { _id: userId } = req.user || {};
+    const userId = req.user?._id;
     if (!userId) {
       return res.status(401).json({
         success: false,
@@ -381,8 +376,7 @@ export const getGISMemberData = async (req, res) => {
 
     const data = await GISMember.findOne({ user: userId })
       .select(projection)
-      .lean()
-      .cache(60 * 5);
+      .lean();
 
     if (!data) {
       return res.status(404).json({
@@ -391,33 +385,56 @@ export const getGISMemberData = async (req, res) => {
       });
     }
 
-    const { user, isDraft, ...responseData } = data;
+    const { user, ...responseData } = data;
 
-    res.json({
+    res.status(200).json({
       success: true,
       data: responseData,
       isDraft: data.isDraft,
     });
   } catch (error) {
-    console.error("Data fetch error:", error);
+    console.error("Error fetching GIS data:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to fetch data",
+      message: "Failed to fetch GIS data",
+      ...(process.env.NODE_ENV === "development" && { error: error.stack }),
     });
   }
 };
 
+// Delete draft
 export const deleteDraft = async (req, res) => {
   try {
-    await GISMember.findOneAndDelete({
-      user: req.user._id,
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized: Please log in first",
+      });
+    }
+
+    const draft = await GISMember.findOneAndDelete({
+      user: userId,
       isDraft: true,
     });
-    res.status(200).json({ message: "Draft deleted successfully" });
+
+    if (!draft) {
+      return res.status(404).json({
+        success: false,
+        message: "No draft found to delete",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Draft deleted successfully",
+    });
   } catch (error) {
+    console.error("Error deleting draft:", error);
     res.status(500).json({
-      message: "Error deleting draft",
-      error: error.message,
+      success: false,
+      message: "Failed to delete draft",
+      ...(process.env.NODE_ENV === "development" && { error: error.stack }),
     });
   }
 };

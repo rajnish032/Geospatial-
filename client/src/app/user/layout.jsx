@@ -1,17 +1,15 @@
-import UserSidebar from "@/components/UserSidebar"
+"use client";
+import UserSidebar from "@/components/UserSidebar";
+
+import React from "react";
 
 const UserLayout = ({ children }) => {
   return (
-    <div className="grid grid-cols-12">
-      <div className="col-span-2 h-screen">
-        <UserSidebar/>
-      </div>
-
-      <div className="col-span-10 bg-gray-100 h-screen">
-        {children}
-      </div>
+    <div className="flex min-h-screen">
+      <UserSidebar />
+      <div className="flex-1 bg-gray-100 p-8">{children}</div>
     </div>
-  )
-}
+  );
+};
 
-export default UserLayout
+export default UserLayout;

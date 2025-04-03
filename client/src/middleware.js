@@ -1,30 +1,38 @@
-import { NextResponse } from 'next/server';
+// middleware.js
+import { NextResponse } from "next/server";
 
-// Paths that should only be accessible when NOT logged in
-const authPaths = ['/account/login', '/account/register'];
+const authPaths = ["/account/login", "/account/register"];
 
 export async function middleware(request) {
   try {
-    const isAuthenticated = request.cookies.get('accessToken')?.value; // ✅ Check for JWT token
+    const isAuthenticated = request.cookies.get("accessToken")?.value;
     const path = request.nextUrl.pathname;
 
-    // ✅ Redirect authenticated users away from login/register pages
-    if (isAuthenticated && authPaths.includes(path)) {
-      return NextResponse.redirect(new URL('/user/profile', request.url));
+    // Allow auth pages during registration flow
+    if (authPaths.includes(path)) {
+      if (isAuthenticated && path === "/account/register") {
+        return NextResponse.redirect(new URL("/account/login", request.url));
+      }
+      return NextResponse.next();
     }
 
-    // ✅ Redirect unauthenticated users away from protected pages
-    if (!isAuthenticated && path.startsWith('/user')) {
-      return NextResponse.redirect(new URL('/account/login', request.url));
+    // Protect user routes
+    if (!isAuthenticated && path.startsWith("/user")) {
+      return NextResponse.redirect(new URL("/account/login", request.url));
+    }
+
+    // Redirect authenticated users to profile from non-user routes
+    if (isAuthenticated && !path.startsWith("/user") && !path.startsWith("/gis-registration")) {
+      return NextResponse.redirect(new URL("/user/profile", request.url));
     }
 
     return NextResponse.next();
   } catch (error) {
-    console.error('Error occurred while checking authentication:', error);
-    return NextResponse.redirect(new URL('/account/login', request.url)); // ✅ Handle errors gracefully
+    console.error("Middleware error:", error);
+    return NextResponse.redirect(new URL("/account/login", request.url));
   }
 }
 
 export const config = {
-  matcher: ['/user/:path*', '/account/login', '/account/register'],
+  matcher: ["/user/:path*", "/account/login", "/account/register", "/gis-registration"],
 };

@@ -1,49 +1,35 @@
 import jwt from "jsonwebtoken";
 import UserRefreshTokenModel from "../models/UserRefreshToken.js";
+
 const generateTokens = async (user) => {
   try {
     const payload = { _id: user._id, roles: user.roles };
-
-    // Generate access token with expiration time
-    const accessTokenExp = Math.floor(Date.now() / 1000) + 60*60; // Set expiration to 1h from now
+    const accessTokenExp = Math.floor(Date.now() / 1000) + 60 * 60; // 1 hour
     const accessToken = jwt.sign(
       { ...payload, exp: accessTokenExp },
       process.env.JWT_ACCESS_TOKEN_SECRET_KEY
-      // { expiresIn: '10s' }
     );
 
-    // Generate refresh token with expiration time
-    const refreshTokenExp = Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 5; // Set expiration to 5 days from now
+    const refreshTokenExp = Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 5; // 5 days
     const refreshToken = jwt.sign(
       { ...payload, exp: refreshTokenExp },
       process.env.JWT_REFRESH_TOKEN_SECRET_KEY
-      // { expiresIn: '5d' }
     );
 
-    const userRefreshToken = await UserRefreshTokenModel.findOneAndDelete({
-      userId: user._id,
-    });
-
-    //  // if want to blacklist rather than remove then use below code
-    // if (userRefreshToken) {
-    //   userRefreshToken.blacklisted = true;
-    //   await userRefreshToken.save();
-    // }
-
-    // Save New Refresh Token
+    await UserRefreshTokenModel.findOneAndDelete({ userId: user._id });
     await new UserRefreshTokenModel({
       userId: user._id,
       token: refreshToken,
     }).save();
 
-    return Promise.resolve({
+    return {
       accessToken,
       refreshToken,
       accessTokenExp,
       refreshTokenExp,
-    });
+    };
   } catch (error) {
-    return Promise.reject(error);
+    throw new Error(`Token generation failed: ${error.message}`);
   }
 };
 

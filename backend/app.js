@@ -2,7 +2,12 @@ import dotenv from "dotenv";
 dotenv.config();
 
 // Environment variable validation
-const requiredEnvVars = ["JWT_ACCESS_TOKEN_SECRET_KEY", "DATABASE_URL"];
+const requiredEnvVars = [
+  "JWT_ACCESS_TOKEN_SECRET_KEY",
+  "DATABASE_URL",
+  "OTPLESS_CLIENT_ID", // Added for OTPless
+  "OTPLESS_CLIENT_SECRET", // Added for OTPless
+];
 requiredEnvVars.forEach((envVar) => {
   if (!process.env[envVar]) {
     console.error(`❌ Error: ${envVar} is required in .env file. Server will not start.`);
@@ -31,7 +36,7 @@ app.use(
     origin: process.env.FRONTEND_HOST || "http://localhost:3000",
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: ["Content-Type", "Authorization", "phoneAuth"],
   })
 );
 
@@ -40,6 +45,7 @@ app.use(express.json({ limit: "10mb" })); // Increased limit for JSON payloads
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(cookieParser());
 app.use(passport.initialize());
+app.use("/uploads", express.static("uploads")); // Serve uploads folder statically
 
 // Database Connection
 connectDB(DATABASE_URL);

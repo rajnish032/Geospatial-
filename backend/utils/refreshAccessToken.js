@@ -3,41 +3,35 @@ import UserRefreshTokenModel from "../models/UserRefreshToken.js";
 import generateTokens from "./generateTokens.js";
 import verifyRefreshToken from "./verifyRefreshToken.js";
 
-const refreshAccessToken = async (req, res) => {
+const refreshAccessToken = async (req) => {
   try {
     const oldRefreshToken = req.cookies.refreshToken;
-    // Verify Refresh Token is valid or not
-    const { tokenDetails, error } = await verifyRefreshToken(oldRefreshToken)
+    const { tokenDetails, error } = await verifyRefreshToken(oldRefreshToken);
 
     if (error) {
-      return res.status(401).send({ status: "failed", message: "Invalid refresh token" });
+      throw new Error("Invalid refresh token");
     }
-    // Find User based on Refresh Token detail id 
-    const user = await UserModel.findById(tokenDetails._id)
 
+    const user = await UserModel.findById(tokenDetails._id);
     if (!user) {
-      return res.status(404).send({ status: "failed", message: "User not found" });
+      throw new Error("User not found");
     }
 
-    const userRefreshToken = await UserRefreshTokenModel.findOne({ userId: tokenDetails._id })
-
-    if (oldRefreshToken !== userRefreshToken.token || userRefreshToken.blacklisted) {
-      return res.status(401).send({ status: "failed", message: "Unauthorized access" });
+    const userRefreshToken = await UserRefreshTokenModel.findOne({ userId: tokenDetails._id });
+    if (!userRefreshToken || oldRefreshToken !== userRefreshToken.token || userRefreshToken.blacklisted) {
+      throw new Error("Unauthorized access: Invalid or blacklisted refresh token");
     }
 
-    // Generate new access and refresh tokens
     const { accessToken, refreshToken, accessTokenExp, refreshTokenExp } = await generateTokens(user);
     return {
       newAccessToken: accessToken,
       newRefreshToken: refreshToken,
       newAccessTokenExp: accessTokenExp,
-      newRefreshTokenExp: refreshTokenExp
+      newRefreshTokenExp: refreshTokenExp,
     };
-
   } catch (error) {
-    console.error(error);
-    res.status(500).send({ status: "failed", message: "Internal server error" });
+    throw new Error(`Refresh token failed: ${error.message}`);
   }
-}
+};
 
-export default refreshAccessToken
+export default refreshAccessToken;

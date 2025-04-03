@@ -1,29 +1,28 @@
 const setTokensCookies = (res, accessToken, refreshToken, newAccessTokenExp, newRefreshTokenExp) => {
   const accessTokenMaxAge = (newAccessTokenExp - Math.floor(Date.now() / 1000)) * 1000;
-  const refreshTokenmaxAge = (newRefreshTokenExp - Math.floor(Date.now() / 1000)) * 1000;
+  const refreshTokenMaxAge = (newRefreshTokenExp - Math.floor(Date.now() / 1000)) * 1000;
+  const isProduction = process.env.NODE_ENV === "production";
 
-  // Set Cookie for Access Token
-  res.cookie('accessToken', accessToken, {
+  res.cookie("accessToken", accessToken, {
     httpOnly: true,
-    secure: true, // Set to true if using HTTPS
+    secure: isProduction, // Secure in production only
     maxAge: accessTokenMaxAge,
-    // sameSite: 'strict', // Adjust according to your requirements
+    sameSite: isProduction ? "strict" : "lax",
   });
 
-  // Set Cookie for Refresh Token
-  res.cookie('refreshToken', refreshToken, {
+  res.cookie("refreshToken", refreshToken, {
     httpOnly: true,
-    secure: true, // Set to true if using HTTPS
-    maxAge: refreshTokenmaxAge,
-    // sameSite: 'strict', // Adjust according to your requirements
+    secure: isProduction,
+    maxAge: refreshTokenMaxAge,
+    sameSite: isProduction ? "strict" : "lax",
   });
-  // Set Cookie for is_auth
-  res.cookie('is_auth', true, {
-    httpOnly: false,
-    secure: false, // Set to true if using HTTPS
-    maxAge: refreshTokenmaxAge,
-    // sameSite: 'strict', // Adjust according to your requirements
-  });
-}
 
-export default setTokensCookies
+  res.cookie("is_auth", true, {
+    httpOnly: false,
+    secure: isProduction,
+    maxAge: refreshTokenMaxAge,
+    sameSite: isProduction ? "strict" : "lax",
+  });
+};
+
+export default setTokensCookies;

@@ -1,25 +1,31 @@
 import transporter from "../config/emailConfig.js";
 import EmailVerificationModel from "../models/EmailVerification.js";
+
 const sendEmailVerificationOTP = async (req, user) => {
-  // Generate a random 4-digit number
-  const otp = Math.floor(1000 + Math.random() * 9000);
+  try {
+    const otp = Math.floor(1000 + Math.random() * 9000).toString();
+    console.log("Generated OTP:", otp);
 
-  // Save OTP in Database
-  await new EmailVerificationModel({ userId: user._id, otp: otp }).save();
+    const mailOptions = {
+      from: process.env.EMAIL_FROM,
+      to: user.email,
+      subject: "Verify Your Email",
+      html: `<p>Hello ${user.name},</p><p>Your OTP is <strong>${otp}</strong>. It expires in 15 minutes.</p>`,
+    };
 
-  //  OTP Verification Link
-  const otpVerificationLink = `${process.env.FRONTEND_HOST}/account/verify-email`;
+    console.log("Sending email to:", user.email);
+    const info = await transporter.sendMail(mailOptions);
+    console.log("Email sent successfully, Message ID:", info.messageId);
 
-  await transporter.sendMail({
-    from: process.env.EMAIL_FROM,
-    to: user.email,
-    subject: "OTP - Verify your account",
-    html: `<p>Dear ${user.name},</p><p>Thank you for signing up with our website. To complete your registration, please verify your email address by entering the following one-time password (OTP): ${otpVerificationLink} </p>
-    <h2>OTP: ${otp}</h2>
-    <p>This OTP is valid for 15 minutes. If you didn't request this OTP, please ignore this email.</p>`
-  })
+    await EmailVerificationModel.create({
+      userId: user._id,
+      otp,
+    });
+    console.log("Email verification record created for user:", user._id);
+  } catch (error) {
+    console.error("Error sending email:", error.stack);
+    throw new Error(`Failed to send email: ${error.message}`);
+  }
+};
 
-  return otp
-}
-
-export default sendEmailVerificationOTP
+export default sendEmailVerificationOTP;

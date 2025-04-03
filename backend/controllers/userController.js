@@ -2,213 +2,304 @@ import UserModel from "../models/User.js";
 import bcrypt from "bcrypt";
 import sendEmailVerificationOTP from "../utils/sendEmailVerificationOTP.js";
 import EmailVerificationModel from "../models/EmailVerification.js";
+import PhoneVerificationModel from "../models/PhoneVerificationModel.js";
 import generateTokens from "../utils/generateTokens.js";
 import setTokensCookies from "../utils/setTokensCookies.js";
 import refreshAccessToken from "../utils/refreshAccessToken.js";
 import UserRefreshTokenModel from "../models/UserRefreshToken.js";
 import jwt from "jsonwebtoken";
 import transporter from "../config/emailConfig.js";
+import otplessClient from "../config/otplessConfig.js";
+
 class UserController {
-  // User Registration
+  // Send Phone Verification OTP via OTPless
+  static sendPhoneVerificationOTP = async (req, user) => {
+    try {
+      const { phoneNumber, countryCode } = user;
+      const fullPhoneNumber = `${countryCode}${phoneNumber}`;
+      console.log("Sending OTP to:", fullPhoneNumber);
+
+      const orderId = await otplessClient.sendOTP(fullPhoneNumber);
+      console.log("OTPless response:", orderId);
+
+      await PhoneVerificationModel.create({
+        userId: user._id,
+        orderId,
+      });
+      console.log("Phone verification record created for user:", user._id);
+
+      return orderId;
+    } catch (error) {
+      console.error("Error in sendPhoneVerificationOTP:", error);
+      throw new Error(`Failed to send phone OTP: ${error.message}`);
+    }
+  };
+
+  // Step 0: Initial Registration (Phone OTP)
   static userRegistration = async (req, res) => {
     try {
-      // Extract request body parameters
-      const { name, email, password, password_confirmation } = req.body;
+      console.log("Request received at /api/user/register:", req.body);
+      const { fullName, phoneNumber, countryCode, areaPin, locality, city, state } = req.body;
 
-      // Check if all required fields are provided
-      if (!name || !email || !password || !password_confirmation) {
-        return res
-          .status(400)
-          .json({ status: "failed", message: "All fields are required" });
+      if (!fullName || !phoneNumber || !countryCode || !areaPin || !locality || !city || !state) {
+        return res.status(400).json({ status: "failed", message: "All fields are required" });
       }
 
-      // Check if password and password_confirmation match
-      if (password !== password_confirmation) {
-        return res
-          .status(400)
-          .json({
-            status: "failed",
-            message: "Password and Confirm Password don't match",
-          });
+      console.log("Checking for existing user with phone:", phoneNumber, countryCode);
+      const existingUserByPhone = await UserModel.findOne({ phoneNumber, countryCode });
+      if (existingUserByPhone) {
+        return res.status(409).json({ 
+          status: "failed", 
+          message: "Phone number is already registered" 
+        });
       }
 
-      // Check if email already exists
-      const existingUser = await UserModel.findOne({ email });
-      if (existingUser) {
-        return res
-          .status(409)
-          .json({ status: "failed", message: "Email already exists" });
+      console.log("Creating new user...");
+      const newUser = await new UserModel({
+        name: fullName,
+        phoneNumber,
+        countryCode,
+        areaPin,
+        locality,
+        city,
+        state,
+        is_phone_verified: false,
+        is_verified: false,
+      }).save();
+      console.log("New user created:", newUser._id);
+
+      console.log("Sending phone OTP...");
+      const orderId = await this.sendPhoneVerificationOTP(req, newUser);
+      console.log("Phone OTP sent, orderId:", orderId);
+
+      res.status(201).json({
+        status: "success",
+        message: "Phone OTP sent. Please verify your phone.",
+        user: { id: newUser._id, phoneNumber: newUser.phoneNumber },
+        orderId,
+      });
+    } catch (error) {
+      console.error("Error in userRegistration:", error.stack);
+      res.status(500).json({
+        status: "failed",
+        message: "Unable to register, please try again later",
+      });
+    }
+  };
+
+  // Verify Phone OTP with OTPless
+  static verifyPhone = async (req, res) => {
+    try {
+      const { phoneNumber, countryCode, otp, orderId } = req.body;
+
+      if (!phoneNumber || !countryCode || !otp || !orderId) {
+        return res.status(400).json({ status: "failed", message: "All fields are required" });
       }
 
-      // Generate salt and hash password
+      const fullPhoneNumber = `${countryCode}${phoneNumber}`;
+      const existingUser = await UserModel.findOne({ phoneNumber, countryCode });
+
+      if (!existingUser) {
+        return res.status(404).json({ status: "failed", message: "Phone number doesn't exist" });
+      }
+
+      if (existingUser.is_phone_verified) {
+        return res.status(400).json({ status: "failed", message: "Phone is already verified" });
+      }
+
+      const phoneVerification = await PhoneVerificationModel.findOne({
+        userId: existingUser._id,
+        orderId,
+      });
+
+      if (!phoneVerification) {
+        const newOrderId = await this.sendPhoneVerificationOTP(req, existingUser);
+        return res.status(400).json({
+          status: "failed",
+          message: "Invalid or expired orderId, new OTP sent to your phone",
+          orderId: newOrderId,
+        });
+      }
+
+      const isVerified = await otplessClient.verifyOTP(fullPhoneNumber, otp, orderId);
+      if (isVerified) {
+        existingUser.is_phone_verified = true;
+        await existingUser.save();
+
+        await PhoneVerificationModel.deleteMany({ userId: existingUser._id });
+
+        const { accessToken } = await generateTokens(existingUser); // Temporary token for Step 1
+        res.status(200).json({
+          status: "success",
+          message: "Phone verified successfully. Proceed to email verification.",
+          phoneAuth: accessToken,
+        });
+      } else {
+        const newOrderId = await this.sendPhoneVerificationOTP(req, existingUser);
+        return res.status(400).json({
+          status: "failed",
+          message: "Invalid OTP, new OTP sent to your phone",
+          orderId: newOrderId,
+        });
+      }
+    } catch (error) {
+      console.error("Error in verifyPhone:", error.stack);
+      res.status(500).json({
+        status: "failed",
+        message: `Unable to verify phone: ${error.message}`,
+      });
+    }
+  };
+
+  // Step 1: Send Email OTP
+  static sendEmailOtp = async (req, res) => {
+    try {
+      const { email, password, phoneNumber, countryCode } = req.body;
+
+      if (!email || !password || !phoneNumber || !countryCode) {
+        return res.status(400).json({ status: "failed", message: "All fields are required" });
+      }
+
+      const existingUser = await UserModel.findOne({ phoneNumber, countryCode });
+      if (!existingUser || !existingUser.is_phone_verified) {
+        return res.status(400).json({ status: "failed", message: "Phone number not verified" });
+      }
+
+      // Check if email is already registered with another user
+      const emailAlreadyRegistered = await UserModel.findOne({ 
+        email, 
+        _id: { $ne: existingUser._id } // Exclude current user
+      });
+      if (emailAlreadyRegistered) {
+        return res.status(409).json({ 
+          status: "failed", 
+          message: "Email is already registered" 
+        });
+      }
+
       const salt = await bcrypt.genSalt(Number(process.env.SALT));
       const hashedPassword = await bcrypt.hash(password, salt);
 
-      // Create new user
-      const newUser = await new UserModel({
-        name,
-        email,
-        password: hashedPassword,
-      }).save();
-
-      sendEmailVerificationOTP(req, newUser);
-
-      // Send success response
-      res.status(201).json({
-        status: "success",
-        message: "Registration Success",
-        user: { id: newUser._id, email: newUser.email },
-      });
-    } catch (error) {
-      console.error(error);
-      res
-        .status(500)
-        .json({
-          status: "failed",
-          message: "Unable to Register, please try again later",
-        });
-    }
-  };
-
-  // User Email Verification
-  static verifyEmail = async (req, res) => {
-    try {
-      // Extract request body parameters
-      const { email, otp } = req.body;
-
-      // Check if all required fields are provided
-      if (!email || !otp) {
-        return res
-          .status(400)
-          .json({ status: "failed", message: "All fields are required" });
-      }
-
-      const existingUser = await UserModel.findOne({ email });
-
-      // Check if email doesn't exists
-      if (!existingUser) {
-        return res
-          .status(404)
-          .json({ status: "failed", message: "Email doesn't exists" });
-      }
-
-      // Check if email is already verified
-      if (existingUser.is_verified) {
-        return res
-          .status(400)
-          .json({ status: "failed", message: "Email is already verified" });
-      }
-
-      // Check if there is a matching email verification OTP
-      const emailVerification = await EmailVerificationModel.findOne({
-        userId: existingUser._id,
-        otp,
-      });
-      if (!emailVerification) {
-        if (!existingUser.is_verified) {
-          // console.log(existingUser);
-          await sendEmailVerificationOTP(req, existingUser);
-          return res
-            .status(400)
-            .json({
-              status: "failed",
-              message: "Invalid OTP, new OTP sent to your email",
-            });
-        }
-        return res
-          .status(400)
-          .json({ status: "failed", message: "Invalid OTP" });
-      }
-
-      // Check if OTP is expired
-      const currentTime = new Date();
-      // 15 * 60 * 1000 calculates the expiration period in milliseconds(15 minutes).
-      const expirationTime = new Date(
-        emailVerification.createdAt.getTime() + 15 * 60 * 1000
-      );
-      if (currentTime > expirationTime) {
-        // OTP expired, send new OTP
-        await sendEmailVerificationOTP(req, existingUser);
-        return res
-          .status(400)
-          .json({
-            status: "failed",
-            message: "OTP expired, new OTP sent to your email",
-          });
-      }
-
-      // OTP is valid and not expired, mark email as verified
-      existingUser.is_verified = true;
+      existingUser.email = email; // Overwrite or set email
+      existingUser.password = hashedPassword; // Overwrite or set password
       await existingUser.save();
 
-      // Delete email verification document
-      await EmailVerificationModel.deleteMany({ userId: existingUser._id });
-      return res
-        .status(200)
-        .json({ status: "success", message: "Email verified successfully" });
+      await sendEmailVerificationOTP(req, existingUser);
+
+      res.status(200).json({
+        status: "success",
+        message: "Email OTP sent. Please verify your email.",
+        user: { id: existingUser._id, email: existingUser.email },
+      });
     } catch (error) {
-      console.error(error);
-      res
-        .status(500)
-        .json({
-          status: "failed",
-          message: "Unable to verify email, please try again later",
-        });
+      console.error("Error in sendEmailOtp:", error.stack);
+      res.status(500).json({
+        status: "failed",
+        message: "Unable to send email OTP, please try again later",
+      });
     }
   };
+
+// Verify Email OTP
+static verifyEmail = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    if (!email || !otp) {
+      return res.status(400).json({ status: "failed", message: "All fields are required" });
+    }
+
+    const existingUser = await UserModel.findOne({ email });
+    if (!existingUser) {
+      return res.status(404).json({ status: "failed", message: "Email doesn't exist" });
+    }
+
+    if (existingUser.is_verified) {
+      return res.status(400).json({ status: "failed", message: "Email is already verified" });
+    }
+
+    const emailVerification = await EmailVerificationModel.findOne({
+      userId: existingUser._id,
+      otp,
+    });
+    if (!emailVerification) {
+      await sendEmailVerificationOTP(req, existingUser);
+      return res.status(400).json({
+        status: "failed",
+        message: "Invalid OTP, new OTP sent to your email",
+      });
+    }
+
+    const currentTime = new Date();
+    const expirationTime = new Date(emailVerification.createdAt.getTime() + 15 * 60 * 1000);
+    if (currentTime > expirationTime) {
+      await sendEmailVerificationOTP(req, existingUser);
+      return res.status(400).json({
+        status: "failed",
+        message: "OTP expired, new OTP sent to your email",
+      });
+    }
+
+    existingUser.is_verified = true;
+    await existingUser.save();
+
+    await EmailVerificationModel.deleteMany({ userId: existingUser._id });
+
+    const { accessToken, refreshToken, accessTokenExp, refreshTokenExp } = await generateTokens(existingUser);
+    setTokensCookies(res, accessToken, refreshToken, accessTokenExp, refreshTokenExp);
+
+    res.status(200).json({
+      status: "success",
+      message: "Email verified and registration completed successfully",
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      access_token_exp: accessTokenExp,
+    });
+  } catch (error) {
+    console.error("Error in verifyEmail:", error.stack);
+    res.status(500).json({
+      status: "failed",
+      message: "Unable to verify email, please try again later",
+    });
+  }
+};
 
   // User Login
   static userLogin = async (req, res) => {
     try {
       const { email, password } = req.body;
-      // Check if email and password are provided
       if (!email || !password) {
-        return res
-          .status(400)
-          .json({
-            status: "failed",
-            message: "Email and password are required",
-          });
+        return res.status(400).json({
+          status: "failed",
+          message: "Email and password are required",
+        });
       }
-      // Find user by email
+
       const user = await UserModel.findOne({ email });
-
-      // Check if user exists
       if (!user) {
-        return res
-          .status(404)
-          .json({ status: "failed", message: "Invalid Email or Password" });
+        return res.status(404).json({ status: "failed", message: "Invalid Email or Password" });
       }
 
-      // Check if user verified
       if (!user.is_verified) {
-        return res
-          .status(401)
-          .json({ status: "failed", message: "Your account is not verified" });
+        return res.status(401).json({ status: "failed", message: "Your email is not verified" });
       }
 
-      // Compare passwords / Check Password
+      if (!user.is_phone_verified) {
+        const orderId = await this.sendPhoneVerificationOTP(req, user);
+        return res.status(401).json({
+          status: "failed",
+          message: "Your phone is not verified. OTP sent to your phone.",
+          orderId,
+        });
+      }
+
       const isMatch = await bcrypt.compare(password, user.password);
       if (!isMatch) {
-        return res
-          .status(401)
-          .json({ status: "failed", message: "Invalid email or password" });
+        return res.status(401).json({ status: "failed", message: "Invalid email or password" });
       }
 
-      // Generate tokens
-      const { accessToken, refreshToken, accessTokenExp, refreshTokenExp } =
-        await generateTokens(user);
+      const { accessToken, refreshToken, accessTokenExp, refreshTokenExp } = await generateTokens(user);
+      setTokensCookies(res, accessToken, refreshToken, accessTokenExp, refreshTokenExp);
 
-      // Set Cookies
-      setTokensCookies(
-        res,
-        accessToken,
-        refreshToken,
-        accessTokenExp,
-        refreshTokenExp
-      );
-
-      // Send success response with tokens
       res.status(200).json({
         user: {
           id: user._id,
@@ -223,38 +314,22 @@ class UserController {
         refresh_token: refreshToken,
         access_token_exp: accessTokenExp,
         is_auth: true,
-        redirectTo: user.isGISRegistered ? "/profile" : "/gis-registration",
       });
     } catch (error) {
-      console.error(error);
-      res
-        .status(500)
-        .json({
-          status: "failed",
-          message: "Unable to login, please try again later",
-        });
+      console.error("Error in userLogin:", error.stack);
+      res.status(500).json({
+        status: "failed",
+        message: "Unable to login, please try again later",
+      });
     }
   };
 
   // Get New Access Token OR Refresh Token
   static getNewAccessToken = async (req, res) => {
     try {
-      // Get new access token using Refresh Token
-      const {
-        newAccessToken,
-        newRefreshToken,
-        newAccessTokenExp,
-        newRefreshTokenExp,
-      } = await refreshAccessToken(req, res);
-
-      // Set New Tokens to Cookie
-      setTokensCookies(
-        res,
-        newAccessToken,
-        newRefreshToken,
-        newAccessTokenExp,
-        newRefreshTokenExp
-      );
+      const { newAccessToken, newRefreshToken, newAccessTokenExp, newRefreshTokenExp } =
+        await refreshAccessToken(req, res);
+      setTokensCookies(res, newAccessToken, newRefreshToken, newAccessTokenExp, newRefreshTokenExp);
 
       res.status(200).send({
         status: "success",
@@ -264,13 +339,11 @@ class UserController {
         access_token_exp: newAccessTokenExp,
       });
     } catch (error) {
-      console.error(error);
-      res
-        .status(500)
-        .json({
-          status: "failed",
-          message: "Unable to generate new token, please try again later",
-        });
+      console.error("Error in getNewAccessToken:", error.stack);
+      res.status(500).json({
+        status: "failed",
+        message: "Unable to generate new token, please try again later",
+      });
     }
   };
 
@@ -283,48 +356,28 @@ class UserController {
   static changeUserPassword = async (req, res) => {
     try {
       const { password, password_confirmation } = req.body;
-
-      // Check if both password and password_confirmation are provided
       if (!password || !password_confirmation) {
-        return res
-          .status(400)
-          .json({
-            status: "failed",
-            message: "New Password and Confirm New Password are required",
-          });
+        return res.status(400).json({
+          status: "failed",
+          message: "New Password and Confirm New Password are required",
+        });
       }
-
-      // Check if password and password_confirmation match
       if (password !== password_confirmation) {
-        return res
-          .status(400)
-          .json({
-            status: "failed",
-            message: "New Password and Confirm New Password don't match",
-          });
+        return res.status(400).json({
+          status: "failed",
+          message: "New Password and Confirm New Password don't match",
+        });
       }
-
-      // Generate salt and hash new password
       const salt = await bcrypt.genSalt(10);
       const newHashPassword = await bcrypt.hash(password, salt);
-
-      // Update user's password
-      await UserModel.findByIdAndUpdate(req.user._id, {
-        $set: { password: newHashPassword },
-      });
-
-      // Send success response
-      res
-        .status(200)
-        .json({ status: "success", message: "Password changed successfully" });
+      await UserModel.findByIdAndUpdate(req.user._id, { $set: { password: newHashPassword } });
+      res.status(200).json({ status: "success", message: "Password changed successfully" });
     } catch (error) {
-      console.error(error);
-      res
-        .status(500)
-        .json({
-          status: "failed",
-          message: "Unable to change password, please try again later",
-        });
+      console.error("Error in changeUserPassword:", error.stack);
+      res.status(500).json({
+        status: "failed",
+        message: "Unable to change password, please try again later",
+      });
     }
   };
 
@@ -332,50 +385,32 @@ class UserController {
   static sendUserPasswordResetEmail = async (req, res) => {
     try {
       const { email } = req.body;
-      // Check if email is provided
       if (!email) {
-        return res
-          .status(400)
-          .json({ status: "failed", message: "Email field is required" });
+        return res.status(400).json({ status: "failed", message: "Email field is required" });
       }
-      // Find user by email
       const user = await UserModel.findOne({ email });
       if (!user) {
-        return res
-          .status(404)
-          .json({ status: "failed", message: "Email doesn't exist" });
+        return res.status(404).json({ status: "failed", message: "Email doesn't exist" });
       }
-      // Generate token for password reset
       const secret = user._id + process.env.JWT_ACCESS_TOKEN_SECRET_KEY;
-      const token = jwt.sign({ userID: user._id }, secret, {
-        expiresIn: "15m",
-      });
-      // Reset Link
+      const token = jwt.sign({ userID: user._id }, secret, { expiresIn: "15m" });
       const resetLink = `${process.env.FRONTEND_HOST}/account/reset-password-confirm/${user._id}/${token}`;
-      console.log(resetLink);
-      // Send password reset email
       await transporter.sendMail({
         from: process.env.EMAIL_FROM,
         to: user.email,
         subject: "Password Reset Link",
         html: `<p>Hello ${user.name},</p><p>Please <a href="${resetLink}">click here</a> to reset your password.</p>`,
       });
-      // Send success response
-      res
-        .status(200)
-        .json({
-          status: "success",
-          message: "Password reset email sent. Please check your email.",
-        });
+      res.status(200).json({
+        status: "success",
+        message: "Password reset email sent. Please check your email.",
+      });
     } catch (error) {
-      console.error(error);
-      res
-        .status(500)
-        .json({
-          status: "failed",
-          message:
-            "Unable to send password reset email. Please try again later.",
-        });
+      console.error("Error in sendUserPasswordResetEmail:", error.stack);
+      res.status(500).json({
+        status: "failed",
+        message: "Unable to send password reset email. Please try again later",
+      });
     }
   };
 
@@ -384,93 +419,61 @@ class UserController {
     try {
       const { password, password_confirmation } = req.body;
       const { id, token } = req.params;
-      // Find user by ID
       const user = await UserModel.findById(id);
       if (!user) {
-        return res
-          .status(404)
-          .json({ status: "failed", message: "User not found" });
+        return res.status(404).json({ status: "failed", message: "User not found" });
       }
-      // Validate token
       const new_secret = user._id + process.env.JWT_ACCESS_TOKEN_SECRET_KEY;
       jwt.verify(token, new_secret);
-
-      // Check if password and password_confirmation are provided
       if (!password || !password_confirmation) {
-        return res
-          .status(400)
-          .json({
-            status: "failed",
-            message: "New Password and Confirm New Password are required",
-          });
+        return res.status(400).json({
+          status: "failed",
+          message: "New Password and Confirm New Password are required",
+        });
       }
-
-      // Check if password and password_confirmation match
       if (password !== password_confirmation) {
-        return res
-          .status(400)
-          .json({
-            status: "failed",
-            message: "New Password and Confirm New Password don't match",
-          });
+        return res.status(400).json({
+          status: "failed",
+          message: "New Password and Confirm New Password don't match",
+        });
       }
-
-      // Generate salt and hash new password
       const salt = await bcrypt.genSalt(10);
       const newHashPassword = await bcrypt.hash(password, salt);
-
-      // Update user's password
-      await UserModel.findByIdAndUpdate(user._id, {
-        $set: { password: newHashPassword },
-      });
-
-      // Send success response
-      res
-        .status(200)
-        .json({ status: "success", message: "Password reset successfully" });
+      await UserModel.findByIdAndUpdate(user._id, { $set: { password: newHashPassword } });
+      res.status(200).json({ status: "success", message: "Password reset successfully" });
     } catch (error) {
-      console.log(error);
+      console.log("Error in userPasswordReset:", error.stack);
       if (error.name === "TokenExpiredError") {
-        return res
-          .status(400)
-          .json({
-            status: "failed",
-            message: "Token expired. Please request a new password reset link.",
-          });
-      }
-      return res
-        .status(500)
-        .json({
+        return res.status(400).json({
           status: "failed",
-          message: "Unable to reset password. Please try again later.",
+          message: "Token expired. Please request a new password reset link.",
         });
+      }
+      return res.status(500).json({
+        status: "failed",
+        message: "Unable to reset password. Please try again later",
+      });
     }
   };
 
   // Logout
   static userLogout = async (req, res) => {
     try {
-      // Optionally, you can blacklist the refresh token in the database
       const refreshToken = req.cookies.refreshToken;
       await UserRefreshTokenModel.findOneAndUpdate(
         { token: refreshToken },
         { $set: { blacklisted: true } }
       );
-
-      // Clear access token and refresh token cookies
       res.clearCookie("accessToken");
       res.clearCookie("refreshToken");
       res.clearCookie("is_auth");
-
       res.status(200).json({ status: "success", message: "Logout successful" });
     } catch (error) {
-      console.error(error);
-      res
-        .status(500)
-        .json({
-          status: "failed",
-          message: "Unable to logout, please try again later",
-        });
+      console.error("Error in userLogout:", error.stack);
+      res.status(500).json({
+        status: "failed",
+        message: "Unable to logout, please try again later",
+      });
     }
   };
 }

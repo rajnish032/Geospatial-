@@ -1,113 +1,110 @@
-import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 
-// Define a service using a base URL and expected endpoints
 export const authApi = createApi({
-  reducerPath: 'authApi',
-  baseQuery: fetchBaseQuery({ baseUrl: 'http://localhost:8000/api/user/' }), 
+  reducerPath: "authApi",
+  baseQuery: fetchBaseQuery({
+    baseUrl: process.env.NEXT_PUBLIC_API_BASE_URL + "/api/user/", // Use env variable
+    credentials: "include", // Include cookies for all requests
+  }),
   endpoints: (builder) => ({
     createUser: builder.mutation({
       query: (user) => ({
-        url: 'register',
-        method: 'POST',
+        url: "register",
+        method: "POST",
         body: user,
-        headers: { 'Content-type': 'application/json' }
-      })
+      }),
+    }),
+
+    verifyPhone: builder.mutation({
+      query: (data) => ({
+        url: "verify-phone",
+        method: "POST",
+        body: data,
+      }),
     }),
 
     verifyEmail: builder.mutation({
-      query: (user) => ({
-        url: `verify-email`,
-        method: 'POST',
-        body: user,
-        headers: { 'Content-type': 'application/json' }
-      })
+      query: (data) => ({
+        url: "verify-email",
+        method: "POST",
+        body: data,
+      }),
     }),
 
     loginUser: builder.mutation({
       query: (user) => ({
-        url: `login`,
-        method: 'POST',
+        url: "login",
+        method: "POST",
         body: user,
-        headers: { 'Content-type': 'application/json' },
-        credentials: 'include'
       }),
-      transformResponse: (response) => {
-        if (response.status === "success") {
-          return {
-            ...response,
-            user: {
+      transformResponse: (response) => ({
+        ...response,
+        user: response.user
+          ? {
               ...response.user,
-              isGISRegistered: response.user.isGISRegistered || false  
+              isGISRegistered: response.user.isGISRegistered ?? false,
             }
-          };
-        }
-        return response;
-      }
+          : null,
+      }),
     }),
 
     getUser: builder.query({
       query: () => ({
-        url: `me`,
-        method: 'GET',
-        credentials: 'include'
+        url: "me",
+        method: "GET",
       }),
       transformResponse: (response) => ({
         ...response,
-        user: {
-          ...response.user,
-          isGISRegistered: response.user.isGISRegistered || false
-        }
-      })
+        user: response.user
+          ? {
+              ...response.user,
+              isGISRegistered: response.user.isGISRegistered ?? false,
+            }
+          : null,
+      }),
     }),
 
     logoutUser: builder.mutation({
       query: () => ({
-        url: `logout`,
-        method: 'POST',
-        credentials: 'include' 
-      })
+        url: "logout",
+        method: "POST",
+      }),
     }),
 
     resetPasswordLink: builder.mutation({
-      query: (user) => ({
-        url: 'reset-password-link',
-        method: 'POST',
-        body: user,
-        headers: { 'Content-type': 'application/json' }
-      })
+      query: (data) => ({
+        url: "send-password-reset-email", // Corrected endpoint
+        method: "POST",
+        body: data,
+      }),
     }),
 
     resetPassword: builder.mutation({
-      query: (data) => {
-        const { id, token, ...values } = data;
-        return {
-          url: `reset-password/${id}/${token}`,
-          method: 'POST',
-          body: values,
-          headers: { 'Content-type': 'application/json' }
-        };
-      }
+      query: ({ id, token, ...values }) => ({
+        url: `reset-password/${id}/${token}`,
+        method: "POST",
+        body: values,
+      }),
     }),
 
     changePassword: builder.mutation({
-      query: (actualData) => ({
-        url: 'change-password',
-        method: 'POST',
-        body: actualData,
-        credentials: 'include'
-      })
-    })
-  })
+      query: (data) => ({
+        url: "change-password",
+        method: "POST",
+        body: data,
+      }),
+    }),
+  }),
 });
 
-
-export const { 
-  useCreateUserMutation, 
-  useVerifyEmailMutation, 
-  useLoginUserMutation, 
-  useGetUserQuery, 
-  useLogoutUserMutation, 
-  useResetPasswordLinkMutation, 
-  useResetPasswordMutation, 
-  useChangePasswordMutation 
+export const {
+  useCreateUserMutation,
+  useVerifyPhoneMutation,
+  useVerifyEmailMutation,
+  useLoginUserMutation,
+  useGetUserQuery,
+  useLogoutUserMutation,
+  useResetPasswordLinkMutation,
+  useResetPasswordMutation,
+  useChangePasswordMutation,
 } = authApi;

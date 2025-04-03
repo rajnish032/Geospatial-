@@ -14,7 +14,7 @@ const Sidebar = () => {
 
   // Navigation items with routes
   const navItems = [
-    { icon: Home, label: "Home", href: "/" },
+    { icon: Home, label: "Dashboard", href: "/user/dashboard" },
     { icon: User, label: "Profile", href: "/user/profile" },
     { icon: Settings, label: "Settings", href: "/user/settings" }, // Adjust route as needed
   ];
@@ -78,8 +78,8 @@ const Sidebar = () => {
         </motion.div>
       </nav>
 
-      {/* User Avatar Section */}
-      <motion.div className="flex items-center gap-4 p-2 mt-auto">
+      {/* User Avatar Section  */}
+       <motion.div className="flex items-center gap-4 p-2 mt-auto">
         <img
           src="/user-avatar.png" // Replace with dynamic user avatar if available
           alt="User"

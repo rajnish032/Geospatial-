@@ -8,6 +8,7 @@ const setTokensCookies = (res, accessToken, refreshToken, newAccessTokenExp, new
     secure: isProduction, // Secure in production only
     maxAge: accessTokenMaxAge,
     sameSite: isProduction ? "strict" : "lax",
+    path: "/",
   });
 
   res.cookie("refreshToken", refreshToken, {
@@ -15,6 +16,7 @@ const setTokensCookies = (res, accessToken, refreshToken, newAccessTokenExp, new
     secure: isProduction,
     maxAge: refreshTokenMaxAge,
     sameSite: isProduction ? "strict" : "lax",
+    path: "/",
   });
 
   res.cookie("is_auth", true, {
@@ -22,6 +24,7 @@ const setTokensCookies = (res, accessToken, refreshToken, newAccessTokenExp, new
     secure: isProduction,
     maxAge: refreshTokenMaxAge,
     sameSite: isProduction ? "strict" : "lax",
+    path: "/",
   });
 };
 

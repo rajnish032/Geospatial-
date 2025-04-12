@@ -10,8 +10,6 @@ import EquipmentTab from "./EquipmentTab";
 import AvailabilityTab from "./AvailabilityTab";
 import TermsTab from "./TermsTab";
 import { useGetUserQuery } from "@/lib/services/auth";
-import { Spin, Tooltip } from 'antd';
-import { SiWhatsapp } from 'react-icons/si';
 
 const createInitialFormData = (userData) => ({
   fullName: userData?.name || "",
@@ -864,18 +862,6 @@ export default function GISRegistrationForm() {
           )}
         </form>
       </div>
-      <Tooltip
-                      color="black"
-                      defaultOpen
-                      title="👋 Need help? Contact our GIS support team"
-                      placement="left"
-                  >
-                      <SiWhatsapp
-                          size={50}
-                          onClick={() => window.open('https://wa.me/916006535445', '_blank')}
-                          className="fixed text-green-500 cursor-pointer duration-500 hover:scale-125 md:bottom-16 lg:right-20 right-10 bottom-20"
-                      />
-                  </Tooltip>
     </div>
   );
 }

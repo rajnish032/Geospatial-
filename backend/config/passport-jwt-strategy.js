@@ -19,4 +19,3 @@ passport.use(new JwtStrategy(opts, async function (jwt_payload, done) {
     return done(err, false);
   }
 }));
-

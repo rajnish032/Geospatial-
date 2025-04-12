@@ -14,18 +14,14 @@ const userSchema = new mongoose.Schema({
   is_phone_verified: { type: Boolean, default: false },
   isGISRegistered: { type: Boolean, default: false },
   roles: { type: [String], enum: ["user", "admin"], default: ["user"] },
-  refreshToken: { type: String },
-
-  // ✅ New Fields
-  isApplied: { type: Boolean, default: false },
-  status: { type: String, default: "pending", enum: ["pending", "review", "approved", "rejected"] }
-
+  refreshToken: { type: String }, 
+isApplied: { type: Boolean, default: false },
+  status: { type: String, default: "pending", enum: ["pending", "review", "approved", "rejected"] },
 }, { timestamps: true });
+
 
 // Ensure phoneNumber and countryCode combination is unique
 userSchema.index({ phoneNumber: 1, countryCode: 1 }, { unique: true });
-
-
 
 const UserModel = mongoose.model("User", userSchema);
 export default UserModel;

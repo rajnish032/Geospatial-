@@ -22,6 +22,12 @@ const GISMemberSchema = new mongoose.Schema(
       required: true,
       unique: true // Kept unique, assuming one draft/registration per user
     },
+    //apply for approval
+    status: {
+      type: String,
+      default: "pending",
+      enum: ["pending", "review", "approved", "rejected"], // Matches applyApproval
+    },
 
     // Personal Info (Tab 1)
     fullName: { type: String, trim: true }, // Required only on final submission

@@ -18,5 +18,6 @@ router.post("/reset-password/:id/:token", UserController.userPasswordReset);
 router.get("/me", accessTokenAutoRefresh, passport.authenticate("jwt", { session: false }), UserController.userProfile);
 router.post("/change-password", accessTokenAutoRefresh, passport.authenticate("jwt", { session: false }), UserController.changeUserPassword);
 router.post("/logout", accessTokenAutoRefresh, passport.authenticate("jwt", { session: false }), UserController.userLogout);
-//router.post("/applyforapproval",auth,applyforavol)
+router.post("/apply-approval",accessTokenAutoRefresh, passport.authenticate("jwt", { session: false }), UserController.applyApproval);
+
 export default router;

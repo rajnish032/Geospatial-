@@ -3,48 +3,124 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Button } from "antd";
+import axios from "axios";
+import Cookies from "universal-cookie";
+import toast from "react-hot-toast";
+
+const cookies = new Cookies(null, {
+  path: "/",
+  sameSite: "lax",
+});
 
 const Navbar = () => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showDropdown, setShowDropdown] = useState(false);
 
-  // Fetch user data from cookies
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+
+  // Fetch user data
   useEffect(() => {
-    const fetchUser = () => {
+    const fetchUser = async () => {
       try {
-        const userCookie = document.cookie
-          .split('; ')
-          .find(row => row.startsWith('user='))
-          ?.split('=')[1];
-        
-        if (userCookie) {
-          const userData = JSON.parse(decodeURIComponent(userCookie));
-          setUser(userData);
-          // Also store in localStorage for quick access
-          localStorage.setItem("user", JSON.stringify(userData));
+        console.log("Navbar cookies:", cookies.getAll());
+
+        const isAuth = cookies.get("is_auth");
+        if (!isAuth) {
+          console.log("No auth cookie found");
+          setUser(null);
+          return;
         }
+
+        const response = await axios.get(`${API_BASE_URL}/api/user/me`, {
+          withCredentials: true,
+        });
+
+        if (!response.data.user) {
+          throw new Error("User data not found");
+        }
+
+        const userData = {
+          id: response.data.user.id,
+          name: response.data.user.name,
+          email: response.data.user.email,
+          isGISRegistered: response.data.user.isGISRegistered || false,
+          status: response.data.user.status || "pending",
+          roles: response.data.user.roles || ["user"],
+          isApplied: response.data.user.isApplied || false,
+        };
+
+        setUser(userData);
       } catch (error) {
-        console.error("Error fetching user:", error);
+        console.error("Error fetching user in Navbar:", {
+          message: error.message,
+          status: error.response?.status,
+          data: error.response?.data,
+        });
+        setUser(null);
+        cookies.remove("is_auth", { path: "/" });
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
+
     fetchUser();
   }, []);
 
+  // Apply for approval
+  const handleApplyForApproval = async () => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/api/user/apply-approval`,
+        {},
+        { withCredentials: true }
+      );
+
+      if (response.data.status === "success") {
+        setUser((prev) => ({
+          ...prev,
+          isApplied: true,
+          status: "review",
+        }));
+        toast.success("Application submitted for approval!");
+      }
+    } catch (error) {
+      console.error("Apply for approval error:", {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data,
+      });
+      const message = error.response?.data?.message || "Failed to apply for approval";
+      toast.error(message);
+    }
+  };
+
   // Logout function
-  const handleLogout = () => {
-    // Clear both cookies and localStorage
-    document.cookie = 'accessToken=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-    document.cookie = 'user=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-    localStorage.removeItem("user");
-    setUser(null);
-    window.location.href = "/login";
+  const handleLogout = async () => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/api/user/logout`,
+        {},
+        { withCredentials: true }
+      );
+
+      if (response.data.status === "success") {
+        cookies.remove("accessToken", { path: "/" });
+        cookies.remove("refreshToken", { path: "/" });
+        cookies.remove("is_auth", { path: "/" });
+        setUser(null);
+        toast.success("Logged out successfully");
+        window.location.href = "/account/login";
+      }
+    } catch (error) {
+      console.error("Logout error:", error.response?.data);
+      toast.error("Failed to log out");
+    }
   };
 
   // Determine profile link based on user state
   const getProfileLink = () => {
-    if (!user) return "/login";
+    if (!user) return "/account/login";
     if (user.isGISRegistered) return "/gis/profile";
     return "/account/profile";
   };
@@ -84,10 +160,10 @@ const Navbar = () => {
               Dashboard
             </Link>
           )}
-
           {user && !user.isApplied && (
             <button
               className="font-semibold relative text-white py-1 px-2 rounded hover:bg-blue-600 bg-blue-500"
+              onClick={handleApplyForApproval}
             >
               Apply for Approval
             </button>
@@ -108,24 +184,24 @@ const Navbar = () => {
           ) : user ? (
             <>
               <div className="w-fit py-2">
-                <p className="font-semibold max-sm:text-sm">{user?.fullName}</p>
-                <p className="text-xs">{user?.role}</p>
+                <p className="font-semibold max-sm:text-sm">{user.name}</p>
+                <p className="text-xs">{user.roles[0]}</p>
                 <p className="text-xs mt-1">
-                  {user?.status === "pending" ? (
+                  {user.status === "pending" ? (
                     <span className="bg-red-600 px-1 text-center w-fit text-white">
                       Not Applied
                     </span>
-                  ) : user?.status === "review" ? (
+                  ) : user.status === "review" ? (
                     <span className="bg-yellow-600 text-center w-fit px-1 text-white">
-                      {user?.status}
+                      Review
                     </span>
-                  ) : user?.status === "rejected" ? (
+                  ) : user.status === "rejected" ? (
                     <span className="bg-red-600 text-center w-fit px-1 text-white">
-                      {user?.status}
+                      Rejected
                     </span>
-                  ) : user?.status === "approved" ? (
+                  ) : user.status === "approved" ? (
                     <span className="bg-green-600 text-center w-fit px-1 text-white">
-                      {user?.status}
+                      Approved
                     </span>
                   ) : null}
                 </p>
@@ -141,8 +217,8 @@ const Navbar = () => {
                   <span className="sr-only">Open user menu</span>
                   <img
                     className="w-8 h-8 rounded-full"
-                    src={user?.profileImage || "/default-avatar.png"}
-                    alt={user?.name}
+                    src="/default-avatar.png"
+                    alt={user.name}
                   />
                 </button>
                 {showDropdown && (
@@ -176,7 +252,10 @@ const Navbar = () => {
                       </li>
                       {!user.isApplied && (
                         <li>
-                          <Button className="block px-4 text-sm bg-green-500 font-semibold text-white mx-auto w-[90%] hover:bg-green-600">
+                          <Button
+                            onClick={handleApplyForApproval}
+                            className="block px-4 text-sm bg-green-500 font-semibold text-white mx-auto w-[90%] hover:bg-green-600"
+                          >
                             Apply for Approval
                           </Button>
                         </li>

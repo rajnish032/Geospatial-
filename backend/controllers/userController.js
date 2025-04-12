@@ -10,6 +10,7 @@ import UserRefreshTokenModel from "../models/UserRefreshToken.js";
 import jwt from "jsonwebtoken";
 import transporter from "../config/emailConfig.js";
 import otplessClient from "../config/otplessConfig.js";
+import GISMember from "../models/GISMemberRegistration.js";
 
 class UserController {
   // Send Phone Verification OTP via OTPless
@@ -268,12 +269,15 @@ static verifyEmail = async (req, res) => {
     try {
       const { email, password } = req.body;
       if (!email || !password) {
-        return res.status(400).json({ message: "Email and password are required",}
-          )};
+        return res.status(400).json({
+          status: "failed",
+          message: "Email and password are required",
+        });
+      }
 
       const user = await UserModel.findOne({ email });
       if (!user) {
-        return res.status(404).json({ message: "Invalid Email or Password" });
+        return res.status(404).json({ status: "failed", message: "Invalid Email or Password" });
       }
 
       if (!user.is_verified) {
@@ -474,26 +478,68 @@ static verifyEmail = async (req, res) => {
     }
   };
 
-  //apply approval
-  // static applyApproval=async(req,res)=>{
-  //   try{
-  //     const Id = req.user._id;
-  //     const user=await UserModel.findById(Id);
-  //     (!user){
+  // Apply for approval
+  static applyApproval = async (req, res) => {
+    try {
+      const user = await UserModel.findById(req.user._id);
+      if (!user) {
+        return res.status(404).json({
+          status: "failed",
+          message: "User not found",
+        });
+      }
 
-  //     }
-  //     user.isApplied=true;
-  //     user.status="review"
-  //     await user.save()
-  //     return res.json({
+      if (!user.isGISRegistered) {
+        return res.status(400).json({
+          status: "failed",
+          message: "Please complete GIS registration first",
+        });
+      }
 
-  //     })
+      if (user.isApplied) {
+        return res.status(400).json({
+          status: "failed",
+          message: "You have already applied for approval",
+        });
+      }
 
-  //   }catch(err){
-  //     console.log(err)
-  //   }
-  // }
-  
+      const gisRegistration = await GISMember.findOne({
+        user: user._id,
+        isDraft: false,
+      });
+
+      if (!gisRegistration) {
+        return res.status(400).json({
+          status: "failed",
+          message: "No completed GIS registration found",
+        });
+      }
+
+      user.isApplied = true;
+      user.status = "review";
+      gisRegistration.status = "review";
+      await user.save();
+      await gisRegistration.save();
+
+      await transporter.sendMail({
+        from: process.env.EMAIL_FROM,
+        to: user.email,
+        subject: "GIS Membership Application Submitted",
+        html: `<p>Hello ${user.name},</p><p>Your GIS membership application is under review.</p>`,
+      });
+
+      res.status(200).json({
+        status: "success",
+        message: "Application submitted for approval",
+      });
+    } catch (error) {
+      console.error("Apply approval error:", error.stack);
+      res.status(500).json({
+        status: "failed",
+        message: `Failed to apply for approval: ${error.message}`,
+      });
+    }
+  };
 }
 
 export default UserController;

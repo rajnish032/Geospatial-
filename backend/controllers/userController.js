@@ -268,15 +268,12 @@ static verifyEmail = async (req, res) => {
     try {
       const { email, password } = req.body;
       if (!email || !password) {
-        return res.status(400).json({
-          status: "failed",
-          message: "Email and password are required",
-        });
-      }
+        return res.status(400).json({ message: "Email and password are required",}
+          )};
 
       const user = await UserModel.findOne({ email });
       if (!user) {
-        return res.status(404).json({ status: "failed", message: "Invalid Email or Password" });
+        return res.status(404).json({ message: "Invalid Email or Password" });
       }
 
       if (!user.is_verified) {
@@ -476,6 +473,27 @@ static verifyEmail = async (req, res) => {
       });
     }
   };
+
+  //apply approval
+  // static applyApproval=async(req,res)=>{
+  //   try{
+  //     const Id = req.user._id;
+  //     const user=await UserModel.findById(Id);
+  //     (!user){
+
+  //     }
+  //     user.isApplied=true;
+  //     user.status="review"
+  //     await user.save()
+  //     return res.json({
+
+  //     })
+
+  //   }catch(err){
+  //     console.log(err)
+  //   }
+  // }
+  
 }
 
 export default UserController;

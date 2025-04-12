@@ -4,7 +4,7 @@ import path from "path";
 import {
   registerGISMember,
   getGISMemberData,
-  updateGISMemberData, // Optional: Keep only if needed
+  updateGISMemberData,
   checkForDraft,
   saveDraft,
   deleteDraft,

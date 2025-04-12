@@ -9,14 +9,20 @@ const Navbar = () => {
   const [loading, setLoading] = useState(true);
   const [showDropdown, setShowDropdown] = useState(false);
 
-  // Fetch user data from localStorage or API
+  // Fetch user data from cookies
   useEffect(() => {
-    const fetchUser = async () => {
+    const fetchUser = () => {
       try {
-        // Fetch user data from API or localStorage
-        const storedUser = localStorage.getItem("user");
-        if (storedUser) {
-          setUser(JSON.parse(storedUser));
+        const userCookie = document.cookie
+          .split('; ')
+          .find(row => row.startsWith('user='))
+          ?.split('=')[1];
+        
+        if (userCookie) {
+          const userData = JSON.parse(decodeURIComponent(userCookie));
+          setUser(userData);
+          // Also store in localStorage for quick access
+          localStorage.setItem("user", JSON.stringify(userData));
         }
       } catch (error) {
         console.error("Error fetching user:", error);
@@ -28,9 +34,19 @@ const Navbar = () => {
 
   // Logout function
   const handleLogout = () => {
-    localStorage.removeItem("user"); // Clear user from storage
-    setUser(null); // Update state
-    window.location.href = "/login"; // Redirect to login
+    // Clear both cookies and localStorage
+    document.cookie = 'accessToken=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+    document.cookie = 'user=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+    localStorage.removeItem("user");
+    setUser(null);
+    window.location.href = "/login";
+  };
+
+  // Determine profile link based on user state
+  const getProfileLink = () => {
+    if (!user) return "/login";
+    if (user.isGISRegistered) return "/gis/profile";
+    return "/account/profile";
   };
 
   return (
@@ -42,45 +58,40 @@ const Navbar = () => {
           className="lg:mx-20 bg-cover cursor-pointer inline-flex overflow-hidden relative md:w-[300px] h-16 w-[150px] items-center"
         >
           <Image
-            src="/logo.png" // Ensure this path is correct
+            src="/logo.png"
             alt="Aero2Astro"
-            width={150} // ✅ Add width
-            height={50} // ✅ Add height
+            width={150}
+            height={50}
             className="max-sm:scale-[1.4] lg:scale-[1.1]"
           />
         </Link>
 
         {/* Navigation */}
         <div className="gap-3 flex text-sm lg:mx-4 lg:justify-end flex-grow items-center max-md:hidden">
-          {!user?.isApplied ? (
+          {user && (
             <Link
               className="font-semibold px-2 hover:text-blue-400"
-              href={"/account/profile"}
+              href={getProfileLink()}
             >
-              Profile
-            </Link>
-          ) : (
-            <Link
-              className="font-semibold px-2 hover:text-blue-400"
-              href={"/user/preview"}
-            >
-              View Profile
+              {user.isGISRegistered ? "GIS Profile" : "Complete Profile"}
             </Link>
           )}
-          <Link
-            className="font-semibold px-2 hover:text-blue-500"
-            href={"/admin/dashboard"}
-          >
-            Dashboard
-          </Link>
+          {user?.isGISRegistered && (
+            <Link
+              className="font-semibold px-2 hover:text-blue-500"
+              href={"/gis/dashboard"}
+            >
+              Dashboard
+            </Link>
+          )}
 
-          <button
-            className={`font-semibold relative text-white py-1 px-2 rounded hover:bg-blue-600 ${
-              user?.isApplied ? "bg-blue-300 cursor-not-allowed" : "bg-blue-500"
-            }`}
-          >
-            {!user?.isApplied ? "Apply for Approval" : "Applied"}
-          </button>
+          {user && !user.isApplied && (
+            <button
+              className="font-semibold relative text-white py-1 px-2 rounded hover:bg-blue-600 bg-blue-500"
+            >
+              Apply for Approval
+            </button>
+          )}
         </div>
 
         {/* User Info and Dropdown */}
@@ -130,48 +141,50 @@ const Navbar = () => {
                   <span className="sr-only">Open user menu</span>
                   <img
                     className="w-8 h-8 rounded-full"
-                    src={user?.avatar || "/default-avatar.png"}
-                    alt={user?.fullName}
+                    src={user?.profileImage || "/default-avatar.png"}
+                    alt={user?.name}
                   />
                 </button>
                 {showDropdown && (
                   <div className="z-50 my-4 text-base fixed top-16 right-5 lg:right-52 list-none shadow-lg bg-white divide-y divide-gray-500 rounded-lg">
                     <div className="px-4 py-3">
                       <span className="block text-sm text-gray-900">
-                        {user.fullName.toUpperCase()}
+                        {user.name?.toUpperCase()}
                       </span>
                       <span className="block text-sm text-gray-900 truncate">
                         {user.email}
                       </span>
                     </div>
                     <ul className="py-2">
-                      <li>
-                        <Link
-                          href="/user/dashboard"
-                          className="block px-4 py-2 text-sm text-gray-700"
-                        >
-                          Dashboard
-                        </Link>
-                      </li>
-                      {!user?.isApplied && (
+                      {user.isGISRegistered && (
                         <li>
                           <Link
-                            href="/user/profile"
-                            className="block px-4 py-2 text-sm text-gray-700"
+                            href="/gis/dashboard"
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                           >
-                            My Profile
+                            GIS Dashboard
                           </Link>
                         </li>
                       )}
                       <li>
-                        <Button className="block px-4 text-sm bg-green-500 font-semibold text-white mx-auto w-[90%]">
-                          Apply for Approval
-                        </Button>
+                        <Link
+                          href={getProfileLink()}
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                        >
+                          {user.isGISRegistered ? "GIS Profile" : "My Profile"}
+                        </Link>
                       </li>
+                      {!user.isApplied && (
+                        <li>
+                          <Button className="block px-4 text-sm bg-green-500 font-semibold text-white mx-auto w-[90%] hover:bg-green-600">
+                            Apply for Approval
+                          </Button>
+                        </li>
+                      )}
                       <li>
                         <Button
                           onClick={handleLogout}
-                          className="block px-4 text-sm bg-blue-500 font-bold text-white w-[90%] mx-auto my-2"
+                          className="block px-4 text-sm bg-blue-500 font-bold text-white w-[90%] mx-auto my-2 hover:bg-blue-600"
                         >
                           Sign out
                         </Button>
@@ -183,8 +196,8 @@ const Navbar = () => {
             </>
           ) : (
             <Link
-              href="/login"
-              className="font-semibold px-4 py-2 bg-blue-500 text-white rounded"
+              href="/account/login"
+              className="font-semibold px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
             >
               Login
             </Link>

@@ -16,7 +16,7 @@ const Sidebar = () => {
   const navItems = [
     { icon: Home, label: "Dashboard", href: "/user/dashboard" },
     { icon: User, label: "Profile", href: "/user/profile" },
-    { icon: Settings, label: "Settings", href: "/user/settings" }, // Adjust route as needed
+    { icon: Settings, label: "Settings", href: "/user/settings" },
   ];
 
   // Logout handler
@@ -24,8 +24,8 @@ const Sidebar = () => {
     try {
       const response = await logoutUser();
       if (response.data && response.data.status === "success") {
-        localStorage.removeItem("token"); // Clear JWT token
-        router.push("/"); // Redirect to home
+        localStorage.removeItem("token");
+        router.push("/");
       } else {
         console.error("Logout failed:", response.error);
       }
@@ -77,16 +77,6 @@ const Sidebar = () => {
           {isOpen && <span>Logout</span>}
         </motion.div>
       </nav>
-
-      {/* User Avatar Section  */}
-       <motion.div className="flex items-center gap-4 p-2 mt-auto">
-        <img
-          src="/user-avatar.png" // Replace with dynamic user avatar if available
-          alt="User"
-          className="w-10 h-10 rounded-full"
-        />
-        {isOpen && <span>Manu Arora</span>} {/* Replace with dynamic user name */}
-      </motion.div>
     </motion.div>
   );
 };

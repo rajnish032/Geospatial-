@@ -10,6 +10,7 @@ const Login = () => {
   const [errorMessage, setErrorMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
   const router = useRouter();
   const [loginUser] = useLoginUserMutation();
 
@@ -18,26 +19,27 @@ const Login = () => {
       .split("; ")
       .find((row) => row.startsWith("accessToken="))
       ?.split("=")[1];
-    console.log("Token from cookie on load:", token);
+    
     if (token) {
-      // Check GIS status on page load if token exists
-      const userCookie = document.cookie
-        .split("; ")
-        .find((row) => row.startsWith("user="))
-        ?.split("=")[1];
-      if (userCookie) {
-        const user = JSON.parse(decodeURIComponent(userCookie));
-        console.log("User from cookie:", user);
-        if (user.isGISRegistered) {
-          router.push("/gis/dashboard");
-        } else {
-          router.push("/gis/profile");
-        }
-      } else {
-        router.push("/gis/profile"); // Default if no user cookie
-      }
+      checkGISStatus();
     }
   }, [router]);
+
+  const checkGISStatus = () => {
+    const userCookie = document.cookie
+      .split("; ")
+      .find((row) => row.startsWith("user="))
+      ?.split("=")[1];
+    
+    if (userCookie) {
+      const user = JSON.parse(decodeURIComponent(userCookie));
+      if (user.isGISRegistered) {
+        router.push("/gis/dashboard");
+      } else {
+        router.push("/gis/profile");
+      }
+    }
+  };
 
   const formik = useFormik({
     initialValues: { email: "", password: "" },
@@ -45,37 +47,69 @@ const Login = () => {
     onSubmit: async (values, { resetForm }) => {
       setLoading(true);
       setErrorMessage("");
-      console.log("Submitting login with:", values);
       try {
         const response = await loginUser(values).unwrap();
-        console.log("Login response:", response);
+        
         if (response?.status === "success") {
-          console.log("Setting cookies...");
+          // Set cookies
           document.cookie = `accessToken=${response.access_token}; path=/; max-age=3600`;
           document.cookie = `user=${JSON.stringify(response.user || {})}; path=/; max-age=3600`;
-          console.log("Cookies set, checking GIS status...");
-          // Redirect based on isGISRegistered
-          if (response.user.isGISRegistered) {
-            console.log("Redirecting to /gis/dashboard");
-            router.push("/gis/dashboard");
-          } else {
-            console.log("Redirecting to /gis/profile");
-            router.push("/gis/profile");
-          }
+          
+          // Show success message
+          setShowSuccess(true);
+          
+          // Hide message and redirect after 1.5 seconds
+          setTimeout(() => {
+            if (response.user.isGISRegistered) {
+              router.push("/gis/dashboard");
+            } else {
+              router.push("/gis/profile");
+            }
+          }, 1500);
+          
           resetForm();
         } else {
           setErrorMessage("Login failed. Please try again.");
         }
       } catch (error) {
-        console.error("Login error:", error);
         setErrorMessage(error?.data?.message || "Network error. Please try again.");
       } finally {
         setLoading(false);
       }
     },
   });
+
   return (
     <div className="min-h-full flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+      {/* Success Popup */}
+      {showSuccess && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg max-w-sm mx-auto">
+            <div className="text-center">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100">
+                <svg
+                  className="h-6 w-6 text-green-600"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+              </div>
+              <h3 className="mt-3 text-lg font-medium text-gray-900">Login Successful!</h3>
+              <div className="mt-2 text-sm text-gray-500">
+                Redirecting you to your profile...
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-md w-full space-y-8">
         <div>
           <Link href="/" className="overflow-clip relative block mx-auto h-24 w-40">

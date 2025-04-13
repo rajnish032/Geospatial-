@@ -16,7 +16,7 @@ const Sidebar = () => {
   const navItems = [
     { icon: Home, label: "Dashboard", href: "/user/dashboard" },
     { icon: User, label: "Profile", href: "/user/profile" },
-    { icon: Settings, label: "Settings", href: "/user/settings" },
+    { icon: Settings, label: "Project", href: "/user/project" },
   ];
 
   // Logout handler

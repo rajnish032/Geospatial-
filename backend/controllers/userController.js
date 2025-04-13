@@ -40,18 +40,40 @@ class UserController {
   static userRegistration = async (req, res) => {
     try {
       console.log("Request received at /api/user/register:", req.body);
-      const { fullName, phoneNumber, countryCode, areaPin, locality, city, state } = req.body;
+      const {
+        fullName,
+        phoneNumber,
+        countryCode,
+        areaPin,
+        locality,
+        city,
+        state,
+      } = req.body;
 
-      if (!fullName || !phoneNumber || !countryCode || !areaPin || !locality || !city || !state) {
-        return res.status(400).json({ status: "failed", message: "All fields are required" });
+      if (
+        !fullName ||
+        !phoneNumber ||
+        !countryCode ||
+        !areaPin ||
+        !locality ||
+        !city ||
+        !state
+      ) {
+        return res.status(400).json({ message: "All fields are required" });
       }
 
-      console.log("Checking for existing user with phone:", phoneNumber, countryCode);
-      const existingUserByPhone = await UserModel.findOne({ phoneNumber, countryCode });
+      console.log(
+        "Checking for existing user with phone:",
+        phoneNumber,
+        countryCode
+      );
+      const existingUserByPhone = await UserModel.findOne({
+        phoneNumber,
+        countryCode,
+      });
       if (existingUserByPhone) {
-        return res.status(409).json({ 
-          status: "failed", 
-          message: "Phone number is already registered" 
+        return res.status(409).json({
+          message: "Phone number is already registered",
         });
       }
 
@@ -74,7 +96,6 @@ class UserController {
       console.log("Phone OTP sent, orderId:", orderId);
 
       res.status(201).json({
-        status: "success",
         message: "Phone OTP sent. Please verify your phone.",
         user: { id: newUser._id, phoneNumber: newUser.phoneNumber },
         orderId,
@@ -82,7 +103,6 @@ class UserController {
     } catch (error) {
       console.error("Error in userRegistration:", error.stack);
       res.status(500).json({
-        status: "failed",
         message: "Unable to register, please try again later",
       });
     }
@@ -94,18 +114,21 @@ class UserController {
       const { phoneNumber, countryCode, otp, orderId } = req.body;
 
       if (!phoneNumber || !countryCode || !otp || !orderId) {
-        return res.status(400).json({ status: "failed", message: "All fields are required" });
+        return res.status(400).json({ message: "All fields are required" });
       }
 
       const fullPhoneNumber = `${countryCode}${phoneNumber}`;
-      const existingUser = await UserModel.findOne({ phoneNumber, countryCode });
+      const existingUser = await UserModel.findOne({
+        phoneNumber,
+        countryCode,
+      });
 
       if (!existingUser) {
-        return res.status(404).json({ status: "failed", message: "Phone number doesn't exist" });
+        return res.status(404).json({ message: "Phone number doesn't exist" });
       }
 
       if (existingUser.is_phone_verified) {
-        return res.status(400).json({ status: "failed", message: "Phone is already verified" });
+        return res.status(400).json({ message: "Phone is already verified" });
       }
 
       const phoneVerification = await PhoneVerificationModel.findOne({
@@ -114,15 +137,21 @@ class UserController {
       });
 
       if (!phoneVerification) {
-        const newOrderId = await this.sendPhoneVerificationOTP(req, existingUser);
+        const newOrderId = await this.sendPhoneVerificationOTP(
+          req,
+          existingUser
+        );
         return res.status(400).json({
-          status: "failed",
           message: "Invalid or expired orderId, new OTP sent to your phone",
           orderId: newOrderId,
         });
       }
 
-      const isVerified = await otplessClient.verifyOTP(fullPhoneNumber, otp, orderId);
+      const isVerified = await otplessClient.verifyOTP(
+        fullPhoneNumber,
+        otp,
+        orderId
+      );
       if (isVerified) {
         existingUser.is_phone_verified = true;
         await existingUser.save();
@@ -131,14 +160,16 @@ class UserController {
 
         const { accessToken } = await generateTokens(existingUser); // Temporary token for Step 1
         res.status(200).json({
-          status: "success",
-          message: "Phone verified successfully. Proceed to email verification.",
+          message:
+            "Phone verified successfully. Proceed to email verification.",
           phoneAuth: accessToken,
         });
       } else {
-        const newOrderId = await this.sendPhoneVerificationOTP(req, existingUser);
+        const newOrderId = await this.sendPhoneVerificationOTP(
+          req,
+          existingUser
+        );
         return res.status(400).json({
-          status: "failed",
           message: "Invalid OTP, new OTP sent to your phone",
           orderId: newOrderId,
         });
@@ -146,7 +177,6 @@ class UserController {
     } catch (error) {
       console.error("Error in verifyPhone:", error.stack);
       res.status(500).json({
-        status: "failed",
         message: `Unable to verify phone: ${error.message}`,
       });
     }
@@ -158,23 +188,25 @@ class UserController {
       const { email, password, phoneNumber, countryCode } = req.body;
 
       if (!email || !password || !phoneNumber || !countryCode) {
-        return res.status(400).json({ status: "failed", message: "All fields are required" });
+        return res.status(400).json({ message: "All fields are required" });
       }
 
-      const existingUser = await UserModel.findOne({ phoneNumber, countryCode });
+      const existingUser = await UserModel.findOne({
+        phoneNumber,
+        countryCode,
+      });
       if (!existingUser || !existingUser.is_phone_verified) {
-        return res.status(400).json({ status: "failed", message: "Phone number not verified" });
+        return res.status(400).json({ message: "Phone number not verified" });
       }
 
       // Check if email is already registered with another user
-      const emailAlreadyRegistered = await UserModel.findOne({ 
-        email, 
-        _id: { $ne: existingUser._id } // Exclude current user
+      const emailAlreadyRegistered = await UserModel.findOne({
+        email,
+        _id: { $ne: existingUser._id }, // Exclude current user
       });
       if (emailAlreadyRegistered) {
-        return res.status(409).json({ 
-          status: "failed", 
-          message: "Email is already registered" 
+        return res.status(409).json({
+          message: "Email is already registered",
         });
       }
 
@@ -188,81 +220,94 @@ class UserController {
       await sendEmailVerificationOTP(req, existingUser);
 
       res.status(200).json({
-        status: "success",
         message: "Email OTP sent. Please verify your email.",
         user: { id: existingUser._id, email: existingUser.email },
       });
     } catch (error) {
       console.error("Error in sendEmailOtp:", error.stack);
       res.status(500).json({
-        status: "failed",
         message: "Unable to send email OTP, please try again later",
       });
     }
   };
 
-// Verify Email OTP
-static verifyEmail = async (req, res) => {
-  try {
-    const { email, otp } = req.body;
-    if (!email || !otp) {
-      return res.status(400).json({ status: "failed", message: "All fields are required" });
-    }
+  // Verify Email OTP
+  static verifyEmail = async (req, res) => {
+    try {
+      const { email, otp } = req.body;
+      if (!email || !otp) {
+        return res
+          .status(400)
+          .json({ status: "failed", message: "All fields are required" });
+      }
 
-    const existingUser = await UserModel.findOne({ email });
-    if (!existingUser) {
-      return res.status(404).json({ status: "failed", message: "Email doesn't exist" });
-    }
+      const existingUser = await UserModel.findOne({ email });
+      if (!existingUser) {
+        return res
+          .status(404)
+          .json({ status: "failed", message: "Email doesn't exist" });
+      }
 
-    if (existingUser.is_verified) {
-      return res.status(400).json({ status: "failed", message: "Email is already verified" });
-    }
+      if (existingUser.is_verified) {
+        return res
+          .status(400)
+          .json({ status: "failed", message: "Email is already verified" });
+      }
 
-    const emailVerification = await EmailVerificationModel.findOne({
-      userId: existingUser._id,
-      otp,
-    });
-    if (!emailVerification) {
-      await sendEmailVerificationOTP(req, existingUser);
-      return res.status(400).json({
+      const emailVerification = await EmailVerificationModel.findOne({
+        userId: existingUser._id,
+        otp,
+      });
+      if (!emailVerification) {
+        await sendEmailVerificationOTP(req, existingUser);
+        return res.status(400).json({
+          status: "failed",
+          message: "Invalid OTP, new OTP sent to your email",
+        });
+      }
+
+      const currentTime = new Date();
+      const expirationTime = new Date(
+        emailVerification.createdAt.getTime() + 15 * 60 * 1000
+      );
+      if (currentTime > expirationTime) {
+        await sendEmailVerificationOTP(req, existingUser);
+        return res.status(400).json({
+          status: "failed",
+          message: "OTP expired, new OTP sent to your email",
+        });
+      }
+
+      existingUser.is_verified = true;
+      await existingUser.save();
+
+      await EmailVerificationModel.deleteMany({ userId: existingUser._id });
+
+      const { accessToken, refreshToken, accessTokenExp, refreshTokenExp } =
+        await generateTokens(existingUser);
+      setTokensCookies(
+        res,
+        accessToken,
+        refreshToken,
+        accessTokenExp,
+        refreshTokenExp
+      );
+
+      res.status(200).json({
+        status: "success",
+        message: "Email verified and registration completed successfully",
+        access_token: accessToken,
+        refresh_token: refreshToken,
+        access_token_exp: accessTokenExp,
+      });
+    } catch (error) {
+      console.error("Error in verifyEmail:", error.stack);
+      res.status(500).json({
         status: "failed",
-        message: "Invalid OTP, new OTP sent to your email",
+        message: "Unable to verify email, please try again later",
       });
     }
-
-    const currentTime = new Date();
-    const expirationTime = new Date(emailVerification.createdAt.getTime() + 15 * 60 * 1000);
-    if (currentTime > expirationTime) {
-      await sendEmailVerificationOTP(req, existingUser);
-      return res.status(400).json({
-        status: "failed",
-        message: "OTP expired, new OTP sent to your email",
-      });
-    }
-
-    existingUser.is_verified = true;
-    await existingUser.save();
-
-    await EmailVerificationModel.deleteMany({ userId: existingUser._id });
-
-    const { accessToken, refreshToken, accessTokenExp, refreshTokenExp } = await generateTokens(existingUser);
-    setTokensCookies(res, accessToken, refreshToken, accessTokenExp, refreshTokenExp);
-
-    res.status(200).json({
-      status: "success",
-      message: "Email verified and registration completed successfully",
-      access_token: accessToken,
-      refresh_token: refreshToken,
-      access_token_exp: accessTokenExp,
-    });
-  } catch (error) {
-    console.error("Error in verifyEmail:", error.stack);
-    res.status(500).json({
-      status: "failed",
-      message: "Unable to verify email, please try again later",
-    });
-  }
-};
+  };
 
   // User Login
   static userLogin = async (req, res) => {
@@ -277,11 +322,15 @@ static verifyEmail = async (req, res) => {
 
       const user = await UserModel.findOne({ email });
       if (!user) {
-        return res.status(404).json({ status: "failed", message: "Invalid Email or Password" });
+        return res
+          .status(404)
+          .json({ status: "failed", message: "Invalid Email or Password" });
       }
 
       if (!user.is_verified) {
-        return res.status(401).json({ status: "failed", message: "Your email is not verified" });
+        return res
+          .status(401)
+          .json({ status: "failed", message: "Your email is not verified" });
       }
 
       if (!user.is_phone_verified) {
@@ -295,11 +344,20 @@ static verifyEmail = async (req, res) => {
 
       const isMatch = await bcrypt.compare(password, user.password);
       if (!isMatch) {
-        return res.status(401).json({ status: "failed", message: "Invalid email or password" });
+        return res
+          .status(401)
+          .json({ status: "failed", message: "Invalid email or password" });
       }
 
-      const { accessToken, refreshToken, accessTokenExp, refreshTokenExp } = await generateTokens(user);
-      setTokensCookies(res, accessToken, refreshToken, accessTokenExp, refreshTokenExp);
+      const { accessToken, refreshToken, accessTokenExp, refreshTokenExp } =
+        await generateTokens(user);
+      setTokensCookies(
+        res,
+        accessToken,
+        refreshToken,
+        accessTokenExp,
+        refreshTokenExp
+      );
 
       res.status(200).json({
         user: {
@@ -328,9 +386,19 @@ static verifyEmail = async (req, res) => {
   // Get New Access Token OR Refresh Token
   static getNewAccessToken = async (req, res) => {
     try {
-      const { newAccessToken, newRefreshToken, newAccessTokenExp, newRefreshTokenExp } =
-        await refreshAccessToken(req, res);
-      setTokensCookies(res, newAccessToken, newRefreshToken, newAccessTokenExp, newRefreshTokenExp);
+      const {
+        newAccessToken,
+        newRefreshToken,
+        newAccessTokenExp,
+        newRefreshTokenExp,
+      } = await refreshAccessToken(req, res);
+      setTokensCookies(
+        res,
+        newAccessToken,
+        newRefreshToken,
+        newAccessTokenExp,
+        newRefreshTokenExp
+      );
 
       res.status(200).send({
         status: "success",
@@ -371,8 +439,12 @@ static verifyEmail = async (req, res) => {
       }
       const salt = await bcrypt.genSalt(10);
       const newHashPassword = await bcrypt.hash(password, salt);
-      await UserModel.findByIdAndUpdate(req.user._id, { $set: { password: newHashPassword } });
-      res.status(200).json({ status: "success", message: "Password changed successfully" });
+      await UserModel.findByIdAndUpdate(req.user._id, {
+        $set: { password: newHashPassword },
+      });
+      res
+        .status(200)
+        .json({ status: "success", message: "Password changed successfully" });
     } catch (error) {
       console.error("Error in changeUserPassword:", error.stack);
       res.status(500).json({
@@ -387,14 +459,20 @@ static verifyEmail = async (req, res) => {
     try {
       const { email } = req.body;
       if (!email) {
-        return res.status(400).json({ status: "failed", message: "Email field is required" });
+        return res
+          .status(400)
+          .json({ status: "failed", message: "Email field is required" });
       }
       const user = await UserModel.findOne({ email });
       if (!user) {
-        return res.status(404).json({ status: "failed", message: "Email doesn't exist" });
+        return res
+          .status(404)
+          .json({ status: "failed", message: "Email doesn't exist" });
       }
       const secret = user._id + process.env.JWT_ACCESS_TOKEN_SECRET_KEY;
-      const token = jwt.sign({ userID: user._id }, secret, { expiresIn: "15m" });
+      const token = jwt.sign({ userID: user._id }, secret, {
+        expiresIn: "15m",
+      });
       const resetLink = `${process.env.FRONTEND_HOST}/account/reset-password-confirm/${user._id}/${token}`;
       await transporter.sendMail({
         from: process.env.EMAIL_FROM,
@@ -422,7 +500,9 @@ static verifyEmail = async (req, res) => {
       const { id, token } = req.params;
       const user = await UserModel.findById(id);
       if (!user) {
-        return res.status(404).json({ status: "failed", message: "User not found" });
+        return res
+          .status(404)
+          .json({ status: "failed", message: "User not found" });
       }
       const new_secret = user._id + process.env.JWT_ACCESS_TOKEN_SECRET_KEY;
       jwt.verify(token, new_secret);
@@ -440,8 +520,12 @@ static verifyEmail = async (req, res) => {
       }
       const salt = await bcrypt.genSalt(10);
       const newHashPassword = await bcrypt.hash(password, salt);
-      await UserModel.findByIdAndUpdate(user._id, { $set: { password: newHashPassword } });
-      res.status(200).json({ status: "success", message: "Password reset successfully" });
+      await UserModel.findByIdAndUpdate(user._id, {
+        $set: { password: newHashPassword },
+      });
+      res
+        .status(200)
+        .json({ status: "success", message: "Password reset successfully" });
     } catch (error) {
       console.log("Error in userPasswordReset:", error.stack);
       if (error.name === "TokenExpiredError") {

@@ -8,6 +8,8 @@ import {
   checkForDraft,
   saveDraft,
   deleteDraft,
+  getGISProfile,
+
 } from "../controllers/gisRegistrationController.js";
 import { protect } from "../middlewares/authMiddleware.js";
 import {
@@ -168,6 +170,7 @@ router
     updateGISMemberData // Add validation if keeping this route
   );
 
+router.get("/profile", protect, getGISProfile);
 // Serve uploaded files statically (optional)
 router.use("/uploads", express.static(uploadDir));
 

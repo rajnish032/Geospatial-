@@ -295,12 +295,139 @@ export const getGISMemberData = async (req, res) => {
 };
 
 export const deleteDraft = async (req, res) => {
+  const session = await mongoose.startSession();
+  try {
+    session.startTransaction();
+
+    const userId = req.user?._id;
+    if (!userId) throw new Error("Unauthorized: Please log in first");
+
+    const draft = await GISMember.findOne({ user: userId, isDraft: true }).session(session);
+    if (!draft) throw new Error("No draft found");
+
+    // Delete any uploaded files associated with the draft
+    const filePaths = [
+      draft.profileImage,
+      draft.certificationFile,
+      ...(draft.workSamples || []),
+    ].filter(Boolean);
+
+    await Promise.all(
+      filePaths.map((path) => fs.unlink(path).catch((err) => console.error("File deletion error:", err)))
+    );
+
+    await GISMember.deleteOne({ _id: draft._id }).session(session);
+
+    await session.commitTransaction();
+
+    res.status(200).json({
+      success: true,
+      message: "Draft deleted successfully",
+    });
+  } catch (error) {
+    await session.abortTransaction();
+    console.error("DeleteDraft Error:", error.message, error.stack);
+    res.status(error.message.includes("Unauthorized") ? 401 : 500).json({
+      success: false,
+      message: error.message,
+      ...(process.env.NODE_ENV === "development" && { error: error.stack }),
+    });
+  } finally {
+    session.endSession();
+  }
+};
+
+export const getGISProfile = async (req, res) => {
   try {
     const userId = req.user?._id;
-    if (!userId) return res.status(401).json({ success: false, message: "Unauthorized: Please log in first" });
-    // ... rest unchanged ...
+    if (!userId) {
+      throw new Error("Unauthorized: User ID not found");
+    }
+
+    const profile = await GISMember.findOne({ user: userId, isDraft: false }).lean();
+
+    if (!profile) {
+      return res.status(404).json({
+        success: false,
+        message: "GIS Profile not found",
+      });
+    }
+
+    // Format profile data
+    const profileData = {
+      fullName: profile.fullName,
+      dob: profile.dob,
+      gender: profile.gender,
+      contactNumber: profile.contactNumber,
+      email: profile.email,
+      nationality: profile.nationality,
+      address: profile.address,
+      pinCode: profile.pinCode,
+      city: profile.city,
+      state: profile.state,
+      profileImage: profile.profileImage ? `/${profile.profileImage}` : null,
+      institution: profile.institution,
+      education: profile.education,
+      certifications: profile.certifications,
+      fieldOfStudy: profile.fieldOfStudy,
+      year: profile.year,
+      gisSoftware: profile.gisSoftware,
+      gisSoftwareOther: profile.gisSoftwareOther,
+      programmingSkills: profile.programmingSkills,
+      programmingSkillsOther: profile.programmingSkillsOther,
+      CoreExpertise: profile.CoreExpertise,
+      CoreExpertiseOther: profile.CoreExpertiseOther,
+      droneDataProcessing: profile.droneDataProcessing,
+      photogrammetrySoftware: profile.photogrammetrySoftware,
+      photogrammetrySoftwareOther: profile.photogrammetrySoftwareOther,
+      remoteSensing: profile.remoteSensing,
+      lidarProcessing: profile.lidarProcessing,
+      experience: profile.experience,
+      organization: profile.organization,
+      employer: profile.employer,
+      linkedIn: profile.linkedIn,
+      portfolio: profile.portfolio,
+      jobTitle: profile.jobTitle,
+      skills: profile.skills,
+      workMode: profile.workMode,
+      workType: profile.workType,
+      workHours: profile.workHours,
+      availability: profile.availability,
+      travelWillingness: profile.travelWillingness,
+      preferredTimeZones: profile.preferredTimeZones,
+      serviceModes: profile.serviceModes,
+      projects: profile.projects,
+      ownEquipment: profile.ownEquipment,
+      availableEquipment: profile.availableEquipment,
+      equipmentName: profile.equipmentName,
+      equipmentBrand: profile.equipmentBrand,
+      equipmentYear: profile.equipmentYear,
+      equipmentSpecs: profile.equipmentSpecs,
+      maintenanceSchedule: profile.maintenanceSchedule,
+      droneCertification: profile.droneCertification,
+      certificationFile: profile.certificationFile ? `/${profile.certificationFile}` : null,
+      equipmentRental: profile.equipmentRental,
+      rentalTerms: profile.rentalTerms,
+      workSamples: profile.workSamples?.map((sample) => `/${sample}`) || [],
+      videoShowcase: profile.videoShowcase,
+      acceptTerms: profile.acceptTerms,
+      consentMarketing: profile.consentMarketing,
+      status: profile.status,
+      submittedAt: profile.submittedAt,
+      profileCompletion: profile.profileCompletion,
+    };
+
+    res.status(200).json({
+      success: true,
+      message: "Profile retrieved successfully",
+      data: profileData,
+    });
   } catch (error) {
-    console.error("Error deleting draft:", error);
-    res.status(500).json({ success: false, message: "Failed to delete draft", ...(process.env.NODE_ENV === "development" && { error: error.stack }) });
+    console.error("Error fetching GIS profile:", error);
+    res.status(error.status || 500).json({
+      success: false,
+      message: error.message || "Failed to fetch GIS profile",
+      ...(process.env.NODE_ENV === "development" && { error: error.stack }),
+    });
   }
 };

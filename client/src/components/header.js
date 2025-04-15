@@ -1,5 +1,4 @@
 "use client";
-
 import Link from "next/link";
 import { Form, Input, Spin, Button } from "antd";
 import { CheckOutlined, KeyOutlined, MailOutlined, UserOutlined } from "@ant-design/icons";
@@ -97,7 +96,7 @@ export default function Register() {
     setRegLoading(true);
     try {
       const res = await axios.post(
-        "http://localhost:8000/api/user/register",
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/user/register`,
         {
           fullName: details.fullName,
           phoneNumber: details.phoneNumber,
@@ -129,7 +128,7 @@ export default function Register() {
     setRegLoading(true);
     try {
       const res = await axios.post(
-        "http://localhost:8000/api/user/verify-phone",
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/user/verify-phone`,
         { phoneNumber: details.phoneNumber, countryCode: details.countryCode, otp: phoneOtp, orderId },
         { withCredentials: true }
       );
@@ -160,7 +159,7 @@ export default function Register() {
     try {
       const phoneAuth = cookies.get("phoneAuth");
       const response = await axios.post(
-        "http://localhost:8000/api/user/send-email-otp",
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/user/send-email-otp`,
         {
           email: details.email,
           password: details.password,
@@ -188,7 +187,7 @@ export default function Register() {
     setRegLoading(true);
     try {
       const res = await axios.post(
-        "http://localhost:8000/api/user/verify-email",
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/user/verify-email`,
         { email: details.email, otp: emailOtp },
         { withCredentials: true }
       );

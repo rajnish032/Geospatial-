@@ -128,7 +128,7 @@ export default function GISRegistrationForm() {
         return;
       }
 
-      const response = await fetch("http://localhost:8000/api/gis-registration/draft", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/gis-registration/draft`, {
         method: "GET",
         credentials: "include",
         headers: {
@@ -411,7 +411,7 @@ export default function GISRegistrationForm() {
         }
         workSamples.forEach((file) => fileFormData.append("workSamples", file));
 
-        const endpoint = "http://localhost:8000/api/gis-registration/submit";
+        const endpoint = `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/gis-registration/submit`;
         const response = await fetch(endpoint, {
           method: "POST",
           body: fileFormData,
@@ -462,7 +462,7 @@ export default function GISRegistrationForm() {
         }
 
         try {
-          const response = await fetch("http://localhost:8000/api/gis-registration/draft", {
+          const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/gis-registration/draft`, {
             method: "PUT",
             body: fileFormData,
             credentials: "include",
@@ -492,7 +492,7 @@ export default function GISRegistrationForm() {
       return;
     try {
       const response = await fetch(
-        "http://localhost:8000/api/gis-registration/draft",
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/gis-registration/draft`,
         {
           method: "DELETE",
           credentials: "include",
@@ -610,10 +610,10 @@ export default function GISRegistrationForm() {
                 ? "bg-red-100 text-red-700"
                 : "bg-green-100 text-green-700"
             }`}>
-              {serverMessage.message}
+              <span className="text-sm">{serverMessage.message}</span>
               <button
                 onClick={() => setServerMessage({ type: "", message: "" })}
-                className="text-sm"
+                className="text-sm ml-2"
               >
                 ✕
               </button>
@@ -655,20 +655,6 @@ export default function GISRegistrationForm() {
   return (
     <div className="min-h-screen py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-5xl mx-auto space-y-8">
-        {/* <h2 className="text-center text-3xl font-bold text-blue-600">
-          GIS Processing Member Registration
-        </h2> */}
-          {/* progress bar */}
-        {/* <div className="relative w-full bg-gray-200 rounded-full h-2.5">
-          <div
-            className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
-            style={{ width: `${(activeTab / 8) * 100}%` }}
-          />
-          <span className="absolute top-[-20px] right-0 text-sm text-gray-600">
-            {Math.round((activeTab / 8) * 100)}%
-          </span>
-        </div> */}
-
         <div className="sticky top-0 z-10 bg-white shadow-md rounded-lg p-2 mb-4">
           <div className="flex overflow-x-auto">
             {[

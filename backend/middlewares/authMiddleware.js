@@ -1,32 +1,25 @@
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
-import dotenv from "dotenv";
 import createError from "http-errors";
-
-dotenv.config();
 
 const verifyJWT = (token, secret) => {
   try {
     return jwt.verify(token, secret);
   } catch (error) {
-    if (error.name === "TokenExpiredError") {
-      throw createError(401, "Token expired, please log in again");
-    }
-    if (error.name === "JsonWebTokenError") {
-      throw createError(401, "Invalid token");
-    }
-    throw createError(401, "Token verification failed");
+    const errorMap = {
+      TokenExpiredError: createError(401, "Token expired, please log in again"),
+      JsonWebTokenError: createError(401, "Invalid token"),
+    };
+    
+    throw errorMap[error.name] || createError(401, "Token verification failed");
   }
 };
 
 export const protect = async (req, res, next) => {
   try {
-    if (process.env.NODE_ENV === "development") {
-      console.log("Incoming Authorization Header:", req.headers.authorization);
-      console.log("Incoming Cookies:", req.cookies);
-    }
-
     let token;
+    
+    // Check both header and cookies for token
     if (req.headers.authorization?.startsWith("Bearer")) {
       token = req.headers.authorization.split(" ")[1];
     } else if (req.cookies?.accessToken) {
@@ -38,12 +31,8 @@ export const protect = async (req, res, next) => {
     }
 
     const decoded = verifyJWT(token, process.env.JWT_ACCESS_TOKEN_SECRET_KEY);
-
-    if (process.env.NODE_ENV === "development") {
-      console.log("Decoded token payload:", decoded);
-    }
-
     const user = await User.findById(decoded._id).select("-password -refreshToken");
+    
     if (!user) {
       throw createError(401, "User not found, authorization denied");
     }
@@ -51,19 +40,20 @@ export const protect = async (req, res, next) => {
     req.user = user;
     next();
   } catch (error) {
+    const response = {
+      success: false,
+      message: error.message,
+    };
+    
     if (process.env.NODE_ENV === "development") {
+      response.error = error.stack;
       console.error("Authentication Error:", {
         message: error.message,
         stack: error.stack,
-        token: req.headers.authorization || req.cookies?.accessToken,
       });
     }
-
-    res.status(error.status || 500).json({
-      success: false,
-      message: error.message,
-      ...(process.env.NODE_ENV === "development" && { error: error.stack }),
-    });
+    
+    res.status(error.status || 500).json(response);
   }
 };
 
@@ -73,10 +63,12 @@ export const authorize = (...roles) => {
       if (!req.user) {
         throw createError(401, "Authentication required");
       }
-      // Check if any of the user's roles match the required roles
-      const userRoles = req.user.roles || ["user"]; // Default to "user" if roles is undefined
-      if (!roles.some((role) => userRoles.includes(role))) {
-        throw createError(403, `User roles ${userRoles.join(", ")} are not authorized to access this route`);
+      
+      const userRoles = req.user.roles || ["user"];
+      if (!roles.some(role => userRoles.includes(role))) {
+        throw createError(403, 
+          `User roles ${userRoles.join(", ")} are not authorized to access this route`
+        );
       }
       next();
     } catch (error) {
@@ -92,6 +84,7 @@ export const authorize = (...roles) => {
 export const verifyRefresh = async (req, res, next) => {
   try {
     const { refreshToken } = req.cookies;
+    
     if (!refreshToken) {
       throw createError(401, "No refresh token provided");
     }
@@ -102,7 +95,8 @@ export const verifyRefresh = async (req, res, next) => {
     if (!user) {
       throw createError(403, "User not found for this refresh token");
     }
-    // Check if refreshToken exists in user document (optional in schema)
+
+    // Optional refresh token validation if stored in user document
     if (user.refreshToken && user.refreshToken !== refreshToken) {
       throw createError(403, "Invalid refresh token");
     }
@@ -110,17 +104,16 @@ export const verifyRefresh = async (req, res, next) => {
     req.user = user;
     next();
   } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("Refresh Token Error:", {
-        message: error.message,
-        stack: error.stack,
-      });
-    }
-
-    res.status(error.status || 500).json({
+    const response = {
       success: false,
       message: error.message,
-      ...(process.env.NODE_ENV === "development" && { error: error.stack }),
-    });
+    };
+    
+    if (process.env.NODE_ENV === "development") {
+      response.error = error.stack;
+      console.error("Refresh Token Error:", error.message);
+    }
+    
+    res.status(error.status || 500).json(response);
   }
 };

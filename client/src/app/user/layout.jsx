@@ -1,13 +1,22 @@
 "use client";
+import { useState } from "react";
 import UserSidebar from "@/components/UserSidebar";
-
-import React from "react";
+import ProfileNavbar from "./components/Navbar";
 
 const UserLayout = ({ children }) => {
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
   return (
     <div className="flex min-h-screen">
-      <UserSidebar />
-      <div className="flex-1 bg-gray-100 p-8">{children}</div>
+      <UserSidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
+      <div 
+        className={`bg-gray-100 transition-all duration-300 ${
+          isSidebarOpen ? "ml-64" : "ml-20"
+        } flex-1 `}
+      >
+        <ProfileNavbar/>
+        {children}
+      </div>
     </div>
   );
 };

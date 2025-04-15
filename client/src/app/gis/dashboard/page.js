@@ -176,13 +176,13 @@ const GISDashboard = () => {
                 </p>
                 <div className="flex flex-col gap-4 my-6">
                   <Link
-                    href="/gis-projects"
+                    href="/user/project"
                     className="bg-green-500 rounded w-full text-center hover:bg-green-600 px-4 py-3 text-lg text-white font-bold transition-colors"
                   >
                     View Available Projects
                   </Link>
                   <Link
-                    href="/gis-profile"
+                    href="/gis/profile"
                     className="bg-blue-500 rounded w-full text-center hover:bg-blue-600 px-4 py-3 text-lg text-white font-bold transition-colors"
                   >
                     Edit Profile

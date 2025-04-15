@@ -1,33 +1,29 @@
 "use client";
 import { useState } from "react";
-import { motion } from "framer-motion";
-import { Home, User, Settings, LogOut } from "lucide-react";
+import { Home, User, Settings, LogOut, ChevronLeft, ChevronRight, GalleryHorizontalEnd } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import { useLogoutUserMutation } from "@/lib/services/auth";
 import Link from "next/link";
+import Image from "next/image";
 
-const Sidebar = () => {
-  const [isOpen, setIsOpen] = useState(false);
+
+const Sidebar = ({ isOpen, setIsOpen }) => {
   const router = useRouter();
   const pathname = usePathname();
   const [logoutUser] = useLogoutUserMutation();
 
-  // Navigation items with routes
   const navItems = [
     { icon: Home, label: "Dashboard", href: "/user/dashboard" },
     { icon: User, label: "Profile", href: "/user/profile" },
-    { icon: Settings, label: "Project", href: "/user/project" },
+    { icon: GalleryHorizontalEnd, label: "Project", href: "/user/project" },
   ];
 
-  // Logout handler
   const handleLogout = async () => {
     try {
       const response = await logoutUser();
-      if (response.data && response.data.status === "success") {
+      if (response.data?.status === "success") {
         localStorage.removeItem("token");
         router.push("/");
-      } else {
-        console.error("Logout failed:", response.error);
       }
     } catch (error) {
       console.error("Logout error:", error);
@@ -35,49 +31,74 @@ const Sidebar = () => {
   };
 
   return (
-    <motion.div
-      className={`fixed left-0 top-0 h-full bg-gray-900 text-white p-4 flex flex-col gap-6 transition-all duration-300 ${
-        isOpen ? "w-60" : "w-16"
-      }`}
-      onMouseEnter={() => setIsOpen(true)}
-      onMouseLeave={() => setIsOpen(false)}
-    >
-      {/* Logo Section */}
-      <motion.div className="flex items-center gap-2">
-        <motion.div
-          className="bg-white p-2 rounded-full"
-          animate={{ rotate: isOpen ? 360 : 0 }}
-          transition={{ duration: 0.5 }}
-        />
-        {isOpen && <span className="text-lg font-bold">Acet Labs</span>}
-      </motion.div>
+    <div className={`bg-white fixed left-0 top-0 h-full p-4 flex flex-col gap-8 border-r ${isOpen ? "w-64" : "w-20"} transition-all duration-300`}>
+      {/* Header with logo and toggle */}
+      <div className="flex items-center justify-between px-2">
+        {isOpen ? (
+          <div className="flex items-center gap-3">
+            <Link href="/">
+            <Image
+              src="/logo.png" // Your logo path
+              alt="Company Logo"
+              width={140} // Increased width for better visibility
+              height={60} // Adjusted height to maintain aspect ratio
+              className="object-contain"
+            />
+            </Link>
+          </div>
+        ) : (
+          <Link href="/">
+          <Image
+            src="/icon512_rounded.png"
+            alt="Company Logo"
+            width={40}
+            height={40}
+            className="object-contain rounded-full"
+          />
+          </Link>
+        )}
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+          aria-label={isOpen ? "Collapse sidebar" : "Expand sidebar"}
+        >
+          {isOpen ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
+        </button>
+      </div>
 
       {/* Navigation */}
-      <nav className="flex flex-col gap-4">
-        {navItems.map(({ icon: Icon, label, href }, index) => (
-          <Link href={href} key={index}>
-            <motion.div
-              className={`flex items-center gap-4 p-2 rounded-lg cursor-pointer ${
-                pathname === href ? "bg-gray-800" : "hover:bg-gray-800"
+      <nav className="flex flex-col gap-1">
+        {navItems.map(({ icon: Icon, label, href }) => (
+          <Link href={href} key={href} className="group">
+            <div
+              className={`flex items-center gap-4 p-3 rounded-lg transition-colors ${
+                pathname === href 
+                  ? "bg-blue-50 text-blue-600" 
+                  : "hover:bg-gray-100 text-gray-700"
               }`}
-              whileHover={{ scale: 1.05 }}
             >
-              <Icon size={24} />
-              {isOpen && <span>{label}</span>}
-            </motion.div>
+              <Icon size={22} className={pathname === href ? "text-blue-500" : "text-gray-500"} />
+              {isOpen && (
+                <span className={`font-medium ${pathname === href ? "text-blue-600" : "text-gray-700"}`}>
+                  {label}
+                </span>
+              )}
+            </div>
           </Link>
         ))}
-        {/* Logout Item */}
-        <motion.div
-          className="flex items-center gap-4 p-2 rounded-lg hover:bg-gray-800 cursor-pointer"
-          whileHover={{ scale: 1.05 }}
-          onClick={handleLogout}
-        >
-          <LogOut size={24} />
-          {isOpen && <span>Logout</span>}
-        </motion.div>
       </nav>
-    </motion.div>
+
+      {/* Footer with logout */}
+      <div className="mt-auto">
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-4 w-full p-3 rounded-lg hover:bg-gray-100 text-gray-700 transition-colors"
+        >
+          <LogOut size={22} className="text-gray-500" />
+          {isOpen && <span className="font-medium">Logout</span>}
+        </button>
+      </div>
+    </div>
   );
 };
 

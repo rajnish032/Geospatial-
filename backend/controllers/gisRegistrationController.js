@@ -57,8 +57,7 @@ export const registerGISMember = async (req, res) => {
       submittedAt: new Date(),
       user: userId,
     };
-    ["_id", ...Object.keys(req.body).filter((k) => k.startsWith("availableEquipment["))]
-      .forEach((key) => delete memberData[key]);
+    ["_id", ...Object.keys(req.body).filter((k) => k.startsWith("availableEquipment["))].forEach((key) => delete memberData[key]);
 
     let newMember;
     const draft = await GISMember.findOne({ user: userId, isDraft: true }).session(session);
@@ -194,6 +193,8 @@ export const saveDraft = async (req, res) => {
         updateData.acceptTerms = req.body.acceptTerms === "true" || req.body.acceptTerms === true;
         updateData.consentMarketing = req.body.consentMarketing === "true" || req.body.consentMarketing === true;
         break;
+      default:
+        throw new Error("Invalid tab number");
     }
 
     Object.keys(updateData).forEach((key) => {
@@ -260,37 +261,215 @@ export const saveDraft = async (req, res) => {
   }
 };
 
-// Other functions unchanged for brevity
+// Update GIS Member Data
 export const updateGISMemberData = async (req, res) => {
+  const session = await mongoose.startSession();
   try {
+    session.startTransaction();
     const userId = req.user?._id;
     if (!userId) return res.status(401).json({ success: false, message: "Unauthorized: Please log in first" });
-    // ... rest unchanged ...
+
+    const memberId = req.params.id;
+    if (!mongoose.Types.ObjectId.isValid(memberId)) {
+      throw new Error("Invalid member ID");
+    }
+
+    const existingMember = await GISMember.findOne({ _id: memberId, user: userId, isDraft: false }).session(session);
+    if (!existingMember) {
+      throw new Error("GIS Member not found or unauthorized to update");
+    }
+
+    const projects = parseArrayField(req.body.projects);
+    const serviceModes = parseArrayField(req.body.serviceModes);
+    const availableEquipment = Object.keys(req.body)
+      .filter((key) => key.startsWith("availableEquipment["))
+      .map((key) => req.body[key].trim())
+      .filter(Boolean);
+
+    const filePaths = {
+      profileImage: req.files?.profileImage?.[0]?.path ? `uploads/${req.files.profileImage[0].filename}` : existingMember.profileImage,
+      workSamples: req.files?.workSamples?.map((f) => `uploads/${f.filename}`) || existingMember.workSamples || [],
+      certificationFile: req.files?.certificationFile?.[0]?.path ? `uploads/${req.files.certificationFile[0].filename}` : existingMember.certificationFile,
+    };
+
+    const updateData = {
+      ...req.body,
+      dob: req.body.dob ? new Date(req.body.dob) : existingMember.dob,
+      projects: projects?.map((p) => (typeof p === "string" ? { title: p, description: "", technologies: "" } : p)) || existingMember.projects,
+      serviceModes: serviceModes || existingMember.serviceModes,
+      availableEquipment: availableEquipment || existingMember.availableEquipment,
+      ...filePaths,
+      updatedAt: new Date(),
+    };
+    if (req.files) {
+      if (req.files.profileImage && existingMember.profileImage) {
+        await fs.unlink(existingMember.profileImage).catch((err) => console.error("Error deleting old profile image:", err));
+      }
+      if (req.files.certificationFile && existingMember.certificationFile) {
+        await fs.unlink(existingMember.certificationFile).catch((err) => console.error("Error deleting old certification file:", err));
+      }
+      if (req.files.workSamples && existingMember.workSamples?.length) {
+        await Promise.all(
+          existingMember.workSamples.map((path) => fs.unlink(path).catch((err) => console.error("Error deleting old work sample:", err)))
+        );
+      }
+    }
+
+    const updatedMember = await GISMember.findOneAndUpdate(
+      { _id: memberId, user: userId },
+      { $set: updateData },
+      { new: true, session, runValidators: true }
+    );
+
+    await session.commitTransaction();
+
+    res.status(200).json({
+      success: true,
+      message: "GIS Member data updated successfully",
+      data: { memberId: updatedMember._id },
+    });
   } catch (error) {
-    console.error("Error updating GIS data:", error);
-    res.status(500).json({ success: false, message: "Failed to update GIS data", ...(process.env.NODE_ENV === "development" && { error: error.stack }) });
+    await session.abortTransaction();
+    if (req.files) {
+      await Promise.all(
+        Object.values(req.files)
+          .flat()
+          .map((file) => fs.unlink(file.path).catch((err) => console.error("File cleanup error:", err)))
+      );
+    }
+    res.status(error.message.includes("Unauthorized") ? 401 : error.message.includes("Invalid") ? 400 : 500).json({
+      success: false,
+      message: error.message,
+      ...(process.env.NODE_ENV === "development" && { error: error.stack }),
+    });
+  } finally {
+    session.endSession();
   }
 };
+
 
 export const checkForDraft = async (req, res) => {
   try {
     const userId = req.user?._id;
     if (!userId) return res.status(401).json({ success: false, message: "Unauthorized: Please log in first" });
-    // ... rest unchanged ...
+
+    const draft = await GISMember.findOne({ user: userId, isDraft: true }).lean();
+
+    if (!draft) {
+      return res.status(200).json({
+        success: true,
+        exists: false,
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      exists: true,
+      draftData: {
+        ...draft,
+        lastSavedTab: draft.lastSavedTab,
+        savedTabs: draft.savedTabs || [],
+      },
+    });
   } catch (error) {
     console.error("Error checking for draft:", error);
-    res.status(500).json({ success: false, message: "Failed to check for draft", ...(process.env.NODE_ENV === "development" && { error: error.stack }) });
+    res.status(500).json({
+      success: false,
+      message: "Failed to check for draft",
+      ...(process.env.NODE_ENV === "development" && { error: error.stack }),
+    });
   }
 };
+
 
 export const getGISMemberData = async (req, res) => {
   try {
     const userId = req.user?._id;
     if (!userId) return res.status(401).json({ success: false, message: "Authentication required" });
-    // ... rest unchanged ...
+
+    const member = await GISMember.findOne({ user: userId, isDraft: false }).lean();
+    if (!member) {
+      return res.status(404).json({
+        success: false,
+        message: "No GIS member data found",
+      });
+    }
+
+    const memberData = {
+      fullName: member.fullName,
+      dob: member.dob,
+      gender: member.gender,
+      contactNumber: member.contactNumber,
+      email: member.email,
+      nationality: member.nationality,
+      address: member.address,
+      pinCode: member.pinCode,
+      city: member.city,
+      state: member.state,
+      profileImage: member.profileImage ? `/${member.profileImage}` : null,
+      institution: member.institution,
+      education: member.education,
+      certifications: member.certifications,
+      fieldOfStudy: member.fieldOfStudy,
+      year: member.year,
+      gisSoftware: member.gisSoftware,
+      gisSoftwareOther: member.gisSoftwareOther,
+      programmingSkills: member.programmingSkills,
+      programmingSkillsOther: member.programmingSkillsOther,
+      CoreExpertise: member.CoreExpertise,
+      CoreExpertiseOther: member.CoreExpertiseOther,
+      droneDataProcessing: member.droneDataProcessing,
+      photogrammetrySoftware: member.photogrammetrySoftware,
+      photogrammetrySoftwareOther: member.photogrammetrySoftwareOther,
+      remoteSensing: member.remoteSensing,
+      lidarProcessing: member.lidarProcessing,
+      experience: member.experience,
+      organization: member.organization,
+      employer: member.employer,
+      linkedIn: member.linkedIn,
+      portfolio: member.portfolio,
+      jobTitle: member.jobTitle,
+      skills: member.skills,
+      workMode: member.workMode,
+      workType: member.workType,
+      workHours: member.workHours,
+      availability: member.availability,
+      travelWillingness: member.travelWillingness,
+      preferredTimeZones: member.preferredTimeZones,
+      serviceModes: member.serviceModes,
+      projects: member.projects,
+      ownEquipment: member.ownEquipment,
+      availableEquipment: member.availableEquipment,
+      equipmentName: member.equipmentName,
+      equipmentBrand: member.equipmentBrand,
+      equipmentYear: member.equipmentYear,
+      equipmentSpecs: member.equipmentSpecs,
+      maintenanceSchedule: member.maintenanceSchedule,
+      droneCertification: member.droneCertification,
+      certificationFile: member.certificationFile ? `/${member.certificationFile}` : null,
+      equipmentRental: member.equipmentRental,
+      rentalTerms: member.rentalTerms,
+      workSamples: member.workSamples?.map((sample) => `/${sample}`) || [],
+      videoShowcase: member.videoShowcase,
+      acceptTerms: member.acceptTerms,
+      consentMarketing: member.consentMarketing,
+      status: member.status,
+      submittedAt: member.submittedAt,
+      profileCompletion: member.profileCompletion,
+    };
+
+    res.status(200).json({
+      success: true,
+      message: "GIS Member data retrieved successfully",
+      data: memberData,
+    });
   } catch (error) {
     console.error("Error fetching GIS data:", error);
-    res.status(500).json({ success: false, message: "Failed to fetch GIS data", ...(process.env.NODE_ENV === "development" && { error: error.stack }) });
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch GIS data",
+      ...(process.env.NODE_ENV === "development" && { error: error.stack }),
+    });
   }
 };
 

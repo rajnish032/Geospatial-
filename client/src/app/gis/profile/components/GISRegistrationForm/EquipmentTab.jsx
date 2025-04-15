@@ -4,6 +4,7 @@ import Checkbox from "../forms/Checkbox";
 import Select from "../forms/Select";
 import FileUpload from "../forms/FileUpload";
 import TabContent from "../forms/TabContent";
+import Textarea from "../forms/Textarea";
 
 const EquipmentTab = ({
   formData,

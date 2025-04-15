@@ -1,11 +1,12 @@
-import Navbar from "../user/components/Navbar"
+import Navbar from "./components/Navbar"
+
 const AccountLayout = ({ children }) => {
   return (
     <>
-      <Navbar/>
+      <Navbar />
       {children}
     </>
   )
 }
 
-export default AccountLayout
+export default AccountLayout;

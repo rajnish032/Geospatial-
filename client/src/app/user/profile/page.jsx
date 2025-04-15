@@ -1,16 +1,22 @@
-// pages/profile.js
 "use client";
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import Image from "next/image";
-import Link from "next/link";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import { Spin } from 'antd';
 
-const ProfilePage = () => {
+const ProfilePage = ({ isSidebarOpen }) => {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Move the function inside the component but before the useEffect
+  const getProfileImageUrl = (imagePath) => {
+    if (!imagePath) return null;
+    // Remove any leading slashes to avoid double slashes in URL
+    const cleanPath = imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
+    return `${process.env.NEXT_PUBLIC_API_BASE_URL}/${cleanPath}`;
+  };
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -31,188 +37,207 @@ const ProfilePage = () => {
     fetchProfile();
   }, []);
 
-  const GISProfile = ({ profile }) => {
-    if (!profile) {
-      return <div className="text-center text-gray-500 py-6">No profile data available.</div>;
-    }
-
+  if (loading) {
     return (
-      <div className="max-w-4xl mx-auto p-6 bg-white shadow-md rounded-lg">
-        <section className="mb-8">
-          <h2 className="text-2xl font-bold mb-4">Profile Status</h2>
-          <p><strong>Status:</strong> {profile.status || "N/A"}</p>
-          <p><strong>Completion:</strong> {profile.profileCompletion || 0}%</p>
-          <p><strong>Submitted:</strong> {profile.submittedAt ? new Date(profile.submittedAt).toLocaleString() : "N/A"}</p>
-        </section>
-
-        <section className="mb-8">
-          <h2 className="text-2xl font-bold mb-4">Personal Information</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {profile.profileImage && (
-              <Image
-                src={profile.profileImage}
-                alt="Profile Picture"
-                width={128}
-                height={128}
-                className="rounded-full object-cover"
-              />
-            )}
-            <p><strong>Name:</strong> {profile.fullName || "N/A"}</p>
-            <p><strong>DOB:</strong> {profile.dob ? new Date(profile.dob).toLocaleDateString() : "N/A"}</p>
-            <p><strong>Gender:</strong> {profile.gender || "N/A"}</p>
-            <p><strong>Contact:</strong> {profile.contactNumber || "N/A"}</p>
-            <p><strong>Email:</strong> {profile.email || "N/A"}</p>
-            <p><strong>Nationality:</strong> {profile.nationality || "N/A"}</p>
-            <p>
-              <strong>Address:</strong> {profile.address || "N/A"}, {profile.city || "N/A"}, {profile.state || "N/A"} {profile.pinCode || ""}
-            </p>
-          </div>
-        </section>
-
-        <section className="mb-8">
-          <h2 className="text-2xl font-bold mb-4">Education</h2>
-          <p><strong>Institution:</strong> {profile.institution || "N/A"}</p>
-          <p><strong>Degree:</strong> {profile.education || "N/A"}</p>
-          <p><strong>Field:</strong> {profile.fieldOfStudy || "N/A"}</p>
-          <p><strong>Year:</strong> {profile.year || "N/A"}</p>
-          <p><strong>Certifications:</strong> {profile.certifications?.join(", ") || "N/A"}</p>
-        </section>
-
-        <section className="mb-8">
-          <h2 className="text-2xl font-bold mb-4">Technical Skills</h2>
-          <p><strong>GIS Software:</strong> {profile.gisSoftware?.join(", ") || profile.gisSoftwareOther || "N/A"}</p>
-          <p><strong>Programming:</strong> {profile.programmingSkills?.join(", ") || profile.programmingSkillsOther || "N/A"}</p>
-          <p><strong>Expertise:</strong> {profile.CoreExpertise?.join(", ") || profile.CoreExpertiseOther || "N/A"}</p>
-          <p><strong>Drone Processing:</strong> {profile.droneDataProcessing || "N/A"}</p>
-          <p><strong>Photogrammetry:</strong> {profile.photogrammetrySoftware?.join(", ") || profile.photogrammetrySoftwareOther || "N/A"}</p>
-          <p><strong>Remote Sensing:</strong> {profile.remoteSensing || "N/A"}</p>
-          <p><strong>LiDAR:</strong> {profile.lidarProcessing || "N/A"}</p>
-        </section>
-
-        <section className="mb-8">
-          <h2 className="text-2xl font-bold mb-4">Professional Information</h2>
-          <p><strong>Experience:</strong> {profile.experience || "N/A"}</p>
-          <p><strong>Organization:</strong> {profile.organization || "N/A"}</p>
-          <p><strong>Employer:</strong> {profile.employer || "N/A"}</p>
-          <p><strong>Job Title:</strong> {profile.jobTitle || "N/A"}</p>
-          <p><strong>Skills:</strong> {profile.skills?.join(", ") || "N/A"}</p>
-          <p>
-            <strong>LinkedIn:</strong>{" "}
-            {profile.linkedIn ? (
-              <Link href={profile.linkedIn} target="_blank" className="text-blue-500">
-                {profile.linkedIn}
-              </Link>
-            ) : (
-              "N/A"
-            )}
-          </p>
-          <p>
-            <strong>Portfolio:</strong>{" "}
-            {profile.portfolio ? (
-              <Link href={profile.portfolio} target="_blank" className="text-blue-500">
-                {profile.portfolio}
-              </Link>
-            ) : (
-              "N/A"
-            )}
-          </p>
-        </section>
-
-        <section className="mb-8">
-          <h2 className="text-2xl font-bold mb-4">Work Preferences</h2>
-          <p><strong>Mode:</strong> {profile.workMode || "N/A"}</p>
-          <p><strong>Type:</strong> {profile.workType || "N/A"}</p>
-          <p><strong>Hours:</strong> {profile.workHours || "N/A"}</p>
-          <p><strong>Availability:</strong> {profile.availability || "N/A"}</p>
-          <p><strong>Travel:</strong> {profile.travelWillingness || "N/A"}</p>
-          <p><strong>Time Zones:</strong> {profile.preferredTimeZones || "N/A"}</p>
-          <p><strong>Service Modes:</strong> {profile.serviceModes?.join(", ") || "N/A"}</p>
-        </section>
-
-        <section className="mb-8">
-          <h2 className="text-2xl font-bold mb-4">Projects</h2>
-          {profile.projects?.length > 0 ? (
-            <ul className="list-disc pl-5">
-              {profile.projects.map((project, index) => (
-                <li key={index}>
-                  <strong>{project.title || "Untitled"}</strong>: {project.description || "No description"} ({project.technologies || "N/A"})
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p>No projects listed.</p>
-          )}
-        </section>
-
-        <section className="mb-8">
-          <h2 className="text-2xl font-bold mb-4">Work Samples</h2>
-          {profile.workSamples?.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {profile.workSamples.map((sample, index) => (
-                <Link key={index} href={sample} target="_blank">
-                  <Image src={sample} alt={`Work Sample ${index + 1}`} width={200} height={150} className="rounded object-cover" />
-                </Link>
-              ))}
-            </div>
-          ) : (
-            <p>No work samples uploaded.</p>
-          )}
-          {profile.videoShowcase && (
-            <div className="mt-4">
-              <h3 className="text-xl font-semibold">Video Showcase</h3>
-              <Link href={profile.videoShowcase} target="_blank" className="text-blue-500">
-                {profile.videoShowcase}
-              </Link>
-            </div>
-          )}
-        </section>
-
-        <section className="mb-8">
-          <h2 className="text-2xl font-bold mb-4">Equipment</h2>
-          <p><strong>Own Equipment:</strong> {profile.ownEquipment || "N/A"}</p>
-          <p><strong>Available:</strong> {profile.availableEquipment?.join(", ") || "N/A"}</p>
-          <p><strong>Name:</strong> {profile.equipmentName || "N/A"}</p>
-          <p><strong>Brand:</strong> {profile.equipmentBrand || "N/A"}</p>
-          <p><strong>Year:</strong> {profile.equipmentYear || "N/A"}</p>
-          <p><strong>Specs:</strong> {profile.equipmentSpecs || "N/A"}</p>
-          <p><strong>Maintenance:</strong> {profile.maintenanceSchedule || "N/A"}</p>
-          <p><strong>Drone Certification:</strong> {profile.droneCertification || "N/A"}</p>
-          {profile.certificationFile && (
-            <p>
-              <strong>Certification:</strong>{" "}
-              <Link href={profile.certificationFile} target="_blank" className="text-blue-500">
-                View
-              </Link>
-            </p>
-          )}
-          <p><strong>Rental:</strong> {profile.equipmentRental || "N/A"}</p>
-          <p><strong>Rental Terms:</strong> {profile.rentalTerms || "N/A"}</p>
-        </section>
-
-        <section className="mb-8">
-          <h2 className="text-2xl font-bold mb-4">Terms</h2>
-          <p><strong>Accept Terms:</strong> {profile.acceptTerms ? "Yes" : "No"}</p>
-          <p><strong>Marketing Consent:</strong> {profile.consentMarketing ? "Yes" : "No"}</p>
-        </section>
-
-        
+      <div className="flex justify-center items-center min-h-screen">
+        <Spin size="large" />
       </div>
     );
-  };
-
-  if (loading) {
-    return <div className="text-center p-6">Loading...</div>;
   }
 
   if (error) {
-    return <div className="text-center p-6 text-red-500">{error}</div>;
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="text-center p-6 text-red-500">{error}</div>
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <h1 className="text-3xl font-bold text-center py-6">GIS Member Profile</h1>
-      <GISProfile profile={profile} />
-      <ToastContainer />
+    <div className="min-h-screen bg-gray-100 transition-all duration-300">
+      <div className="p-4 md:p-6">
+        {/* Personal Information Section */}
+        <div className="bg-white rounded-lg shadow p-4 md:p-6 mb-6">
+          <h2 className="text-xl font-semibold mb-4 text-blue-600 bg-blue-50 p-2 rounded">
+            Personal Information
+          </h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Profile Image */}
+            <div className="flex items-center gap-6">
+              {profile.profileImage ? (
+                <div className="relative">
+                  <img 
+                    src={getProfileImageUrl(profile.profileImage)} 
+                    alt="Profile" 
+                    className="w-24 h-24 rounded-full object-cover border-2 border-gray-200"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      e.target.nextElementSibling.style.display = 'flex';
+                    }}
+                  />
+                  <div className="w-24 h-24 rounded-full bg-gray-200 hidden items-center justify-center text-gray-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  </div>
+                </div>
+              ) : (
+                <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center text-gray-400">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                </div>
+              )}
+              <div>
+                <h3 className="text-2xl font-semibold text-gray-800">{profile.fullName || 'Not specified'}</h3>
+                <p className="text-gray-600">{profile.jobTitle || 'No job title'}</p>
+              </div>
+            </div>
+
+            {/* Basic Info */}
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Date of Birth</p>
+                  <p className="text-gray-800">
+                    {profile.dob ? new Date(profile.dob).toLocaleDateString() : 'Not specified'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Gender</p>
+                  <p className="text-gray-800">{profile.gender || 'Not specified'}</p>
+                </div>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-500">Email</p>
+                <p className="text-gray-800">{profile.email || 'Not specified'}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-500">Contact Number</p>
+                <p className="text-gray-800">{profile.contactNumber || 'Not specified'}</p>
+              </div>
+            </div>
+
+            {/* Address Information */}
+            <div className="space-y-3">
+              <h4 className="font-medium text-gray-800">Address</h4>
+              <p className="text-gray-700">
+                {profile.address || 'No address provided'}
+                {profile.city && `, ${profile.city}`}
+                {profile.state && `, ${profile.state}`}
+                {profile.pinCode && ` - ${profile.pinCode}`}
+              </p>
+              <div>
+                <p className="text-sm font-medium text-gray-500">Nationality</p>
+                <p className="text-gray-800">{profile.nationality || 'Not specified'}</p>
+              </div>
+            </div>
+
+            {/* Professional Links */}
+            <div className="space-y-3">
+              <h4 className="font-medium text-gray-800">Professional Links</h4>
+              {profile.linkedIn && (
+                <div className="flex items-center gap-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/>
+                  </svg>
+                  <a href={profile.linkedIn} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                    LinkedIn Profile
+                  </a>
+                </div>
+              )}
+              {profile.portfolio && (
+                <div className="flex items-center gap-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                  </svg>
+                  <a href={profile.portfolio} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                    Portfolio Website
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Education & Professional Information Section */}
+        <div className="bg-white rounded-lg shadow p-4 md:p-6">
+          <h2 className="text-xl font-semibold mb-4 text-blue-600 bg-blue-50 p-2 rounded">
+            Education & Professional Information
+          </h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Education */}
+            <div className="space-y-4">
+              <h3 className="font-medium text-lg text-blue-600">Education</h3>
+              <div className="space-y-3">
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Institution</p>
+                  <p className="text-gray-800">{profile.institution || 'Not specified'}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Degree/Qualification</p>
+                  <p className="text-gray-800">{profile.education || 'Not specified'}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Field of Study</p>
+                  <p className="text-gray-800">{profile.fieldOfStudy || 'Not specified'}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Year</p>
+                  <p className="text-gray-800">{profile.year || 'Not specified'}</p>
+                </div>
+              </div>
+
+              {profile.certifications?.length > 0 && (
+                <div>
+                  <h4 className="font-medium text-gray-800 mb-2">Certifications</h4>
+                  <ul className="list-disc pl-5 space-y-1">
+                    {profile.certifications.map((cert, index) => (
+                      <li key={index} className="text-gray-700">{cert}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            {/* Professional Info */}
+            <div className="space-y-4">
+              <h3 className="font-medium text-lg text-blue-600">Professional Information</h3>
+              <div className="space-y-3">
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Experience</p>
+                  <p className="text-gray-800">{profile.experience || 'Not specified'}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Current/Most Recent Organization</p>
+                  <p className="text-gray-800">{profile.organization || 'Not specified'}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Employment Type</p>
+                  <p className="text-gray-800">{profile.employer || 'Not specified'}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Skills</p>
+                  <div className="flex flex-wrap gap-2 mt-1">
+                    {profile.skills?.length > 0 ? (
+                      profile.skills.map((skill, index) => (
+                        <span key={index} className="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-sm">
+                          {skill}
+                        </span>
+                      ))
+                    ) : (
+                      <p className="text-gray-500">No skills listed</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <ToastContainer position="bottom-right" />
     </div>
   );
 };

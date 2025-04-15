@@ -14,11 +14,11 @@ export default function Navbar({ toggleTheme, theme }) {
 
   // Navigation items array
   const navItems = [
-    { name: "Home", href: "/" },
+    { name: "Home", href: "https://www.aero2astro.com/" },
     { name: "About", href: "/about" },
     { name: "Partners", href: "/partners" },
-    { name: "FAQ's", href: "/faq" },
-    { name: "Profile", href: "/profile" },
+    { name: "FAQ's", href: "/FAQ" },
+    { name: "Profile", href: "/user/profile" },
   ];
 
   return (
@@ -149,7 +149,7 @@ export default function Navbar({ toggleTheme, theme }) {
           >
             Login
           </Link>
-          {/* Theme Toggle Button */}
+          {/* Theme Toggle Button
           <button
             onClick={toggleTheme}
             className="p-2 rounded-full bg-gray-700 hover:bg-gray-600 text-primary transition-colors duration-200"
@@ -186,7 +186,7 @@ export default function Navbar({ toggleTheme, theme }) {
                 />
               </svg>
             )}
-          </button>
+          </button> */}
         </div>
       </div>
 

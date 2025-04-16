@@ -9,8 +9,7 @@ import toast from "react-hot-toast";
 
 const cookies = new Cookies(null, {
   path: "/",
-  sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-  secure: process.env.NODE_ENV === "production",
+  sameSite: "lax",
 });
 
 const Navbar = () => {
@@ -24,13 +23,11 @@ const Navbar = () => {
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        console.log("Environment:", process.env.NODE_ENV);
-        console.log("API_BASE_URL:", API_BASE_URL);
         console.log("Navbar cookies:", cookies.getAll());
 
-        const isAuth = cookies.get("is_auth") || cookies.get("auth");
+        const isAuth = cookies.get("is_auth");
         if (!isAuth) {
-          console.log("No is_auth or auth cookie found");
+          console.log("No auth cookie found");
           setUser(null);
           return;
         }
@@ -62,10 +59,6 @@ const Navbar = () => {
         });
         setUser(null);
         cookies.remove("is_auth", { path: "/" });
-        cookies.remove("auth", { path: "/" });
-        cookies.remove("accessToken", { path: "/" });
-        cookies.remove("refreshToken", { path: "/" });
-        cookies.remove("user", { path: "/" });
       } finally {
         setLoading(false);
       }
@@ -77,7 +70,6 @@ const Navbar = () => {
   // Apply for approval
   const handleApplyForApproval = async () => {
     try {
-      console.log("Applying for approval...");
       const response = await axios.post(
         `${API_BASE_URL}/api/user/apply-approval`,
         {},
@@ -106,7 +98,6 @@ const Navbar = () => {
   // Logout function
   const handleLogout = async () => {
     try {
-      console.log("Logging out...");
       const response = await axios.post(
         `${API_BASE_URL}/api/user/logout`,
         {},
@@ -117,8 +108,6 @@ const Navbar = () => {
         cookies.remove("accessToken", { path: "/" });
         cookies.remove("refreshToken", { path: "/" });
         cookies.remove("is_auth", { path: "/" });
-        cookies.remove("auth", { path: "/" });
-        cookies.remove("user", { path: "/" });
         setUser(null);
         toast.success("Logged out successfully");
         window.location.href = "/account/login";

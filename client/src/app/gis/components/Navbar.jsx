@@ -9,7 +9,8 @@ import toast from "react-hot-toast";
 
 const cookies = new Cookies(null, {
   path: "/",
-  sameSite: "lax",
+  sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+  secure: process.env.NODE_ENV === "production",
 });
 
 const Navbar = () => {
@@ -23,6 +24,8 @@ const Navbar = () => {
   useEffect(() => {
     const fetchUser = async () => {
       try {
+        console.log("Environment:", process.env.NODE_ENV);
+        console.log("API_BASE_URL:", API_BASE_URL);
         console.log("Navbar cookies:", cookies.getAll());
 
         const isAuth = cookies.get("is_auth");
@@ -59,6 +62,8 @@ const Navbar = () => {
         });
         setUser(null);
         cookies.remove("is_auth", { path: "/" });
+        cookies.remove("accessToken", { path: "/" });
+        cookies.remove("refreshToken", { path: "/" });
       } finally {
         setLoading(false);
       }
@@ -70,6 +75,7 @@ const Navbar = () => {
   // Apply for approval
   const handleApplyForApproval = async () => {
     try {
+      console.log("Applying for approval...");
       const response = await axios.post(
         `${API_BASE_URL}/api/user/apply-approval`,
         {},
@@ -98,6 +104,7 @@ const Navbar = () => {
   // Logout function
   const handleLogout = async () => {
     try {
+      console.log("Logging out...");
       const response = await axios.post(
         `${API_BASE_URL}/api/user/logout`,
         {},

@@ -28,9 +28,9 @@ const Navbar = () => {
         console.log("API_BASE_URL:", API_BASE_URL);
         console.log("Navbar cookies:", cookies.getAll());
 
-        const isAuth = cookies.get("is_auth");
+        const isAuth = cookies.get("is_auth") || cookies.get("auth");
         if (!isAuth) {
-          console.log("No auth cookie found");
+          console.log("No is_auth or auth cookie found");
           setUser(null);
           return;
         }
@@ -62,8 +62,10 @@ const Navbar = () => {
         });
         setUser(null);
         cookies.remove("is_auth", { path: "/" });
+        cookies.remove("auth", { path: "/" });
         cookies.remove("accessToken", { path: "/" });
         cookies.remove("refreshToken", { path: "/" });
+        cookies.remove("user", { path: "/" });
       } finally {
         setLoading(false);
       }
@@ -115,6 +117,8 @@ const Navbar = () => {
         cookies.remove("accessToken", { path: "/" });
         cookies.remove("refreshToken", { path: "/" });
         cookies.remove("is_auth", { path: "/" });
+        cookies.remove("auth", { path: "/" });
+        cookies.remove("user", { path: "/" });
         setUser(null);
         toast.success("Logged out successfully");
         window.location.href = "/account/login";

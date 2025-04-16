@@ -8,34 +8,31 @@ const setTokensCookies = (res, accessToken, refreshToken, newAccessTokenExp, new
     httpOnly: true,
     secure: isProduction,
     maxAge: accessTokenMaxAge,
-    sameSite: isProduction ? "strict" : "lax",
+    sameSite: isProduction ? "none" : "lax",
     path: "/",
-    maxAge: accessTokenMaxAge,
   });
 
   res.cookie("refreshToken", refreshToken, {
     httpOnly: true,
     secure: isProduction,
     maxAge: refreshTokenMaxAge,
-    sameSite: isProduction ? "strict" : "lax",
+    sameSite: isProduction ? "none" : "lax",
     path: "/",
-    maxAge: refreshTokenMaxAge,
   });
 
   res.cookie("is_auth", true, {
     httpOnly: false,
     secure: isProduction,
     maxAge: refreshTokenMaxAge,
-    sameSite: isProduction ? "strict" : "lax",
+    sameSite: isProduction ? "none" : "lax",
     path: "/",
-    maxAge: refreshTokenMaxAge,
   });
 
-  if (!isProduction) {
-    console.log("Cookies set:");
-    console.log("AccessToken:", accessToken);
-    console.log("RefreshToken:", refreshToken);
-  }
+  console.log("Cookies set:", {
+    accessToken: accessToken.slice(0, 20) + "...",
+    refreshToken: refreshToken.slice(0, 20) + "...",
+    isProduction,
+  });
 };
 
 export default setTokensCookies;

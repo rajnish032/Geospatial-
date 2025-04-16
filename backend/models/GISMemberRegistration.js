@@ -249,7 +249,7 @@ GISMemberSchema.virtual("profileCompletion").get(function () {
 });
 
 // Indexes for better query performance
-GISMemberSchema.index({ user: 1 });
+//GISMemberSchema.index({ user: 1 });
 GISMemberSchema.index({ email: 1 });
 GISMemberSchema.index({ skills: 1 });
 GISMemberSchema.index({ gisSoftware: 1 });
